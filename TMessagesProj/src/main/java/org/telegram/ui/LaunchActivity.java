@@ -6118,6 +6118,13 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
 
     private boolean firstAppUpdateCheck = true;
     public void checkAppUpdate(boolean force, Browser.Progress progress) {
+        // Abugram: updates come from the Abugram site, never Telegram's own APK (a different app).
+        if (progress != null) {
+            progress.end();
+        }
+        if (true) {
+            return;
+        }
         if (!ApplicationLoader.isStandaloneBuild() && !ApplicationLoader.isBetaBuild()) {
             return;
         }
