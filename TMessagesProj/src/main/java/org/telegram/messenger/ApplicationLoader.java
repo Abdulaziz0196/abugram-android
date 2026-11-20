@@ -365,6 +365,7 @@ public class ApplicationLoader extends Application {
 
         LauncherIconController.tryFixLauncherIconIfNeeded();
         ProxyRotationController.init();
+        AbugramConfig.load();
         AbugramProxy.start(); // Abugram: built-in proxy, works without a VPN
 
         //if (BuildConfig.DEBUG_PRIVATE_VERSION) {

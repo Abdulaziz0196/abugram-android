@@ -12432,7 +12432,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         } else if (isArchive()) {
             newVisibility = !getStoriesController().getHiddenList().isEmpty();
         } else {
-            newVisibility = !onlySelfStories && getStoriesController().hasStories();
+            newVisibility = !org.telegram.messenger.AbugramConfig.hideStories && !onlySelfStories && getStoriesController().hasStories();
             onlySelfStories = getStoriesController().hasOnlySelfStories();
         }
 
