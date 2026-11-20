@@ -92,10 +92,19 @@ public class LocaleController {
                     }
                     lang = lang.toLowerCase();
                     formatterDay = createFormatter(lang.toLowerCase().equals("ar") || lang.toLowerCase().equals("ko") ? locale : Locale.US, is24HourFormat ? getStringInternal("formatterDay24H", R.string.formatterDay24H) : getStringInternal("formatterDay12H", R.string.formatterDay12H), is24HourFormat ? "HH:mm" : "h:mm a");
+                    if (AbugramConfig.showSeconds) {
+                        // Abugram: times down to the second (Settings → Abugram)
+                        formatterDay = createFormatter(locale, is24HourFormat ? "HH:mm:ss" : "h:mm:ss a", is24HourFormat ? "HH:mm:ss" : "h:mm:ss a");
+                    }
                 }
             }
         }
         return formatterDay;
+    }
+
+    /** Abugram: drops the cached time format, after the seconds switch changed. */
+    public void abugramResetFormatterDay() {
+        formatterDay = null;
     }
 
     private volatile FastDateFormat formatterDayWithSeconds;

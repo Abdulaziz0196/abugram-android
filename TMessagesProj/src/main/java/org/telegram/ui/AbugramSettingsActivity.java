@@ -3,6 +3,7 @@ package org.telegram.ui;
 import android.view.View;
 
 import org.telegram.messenger.AbugramConfig;
+import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.ui.Cells.TextCheckCell;
 import org.telegram.ui.Components.UItem;
@@ -23,6 +24,8 @@ public class AbugramSettingsActivity extends UniversalFragment {
     private static final int ID_HIDE_STORIES = 7;
     private static final int ID_SHOW_IDS = 8;
     private static final int ID_PROXY = 9;
+    private static final int ID_SHOW_SECONDS = 10;
+    private static final int ID_CONFIRM_CALLS = 11;
 
     @Override
     protected CharSequence getTitle() {
@@ -47,11 +50,20 @@ public class AbugramSettingsActivity extends UniversalFragment {
 
         items.add(UItem.asHeader("Ko'rinish / Внешний вид"));
         items.add(UItem.asCheck(ID_HIDE_STORIES, "Story panelini yashirish").setChecked(AbugramConfig.hideStories));
+        items.add(UItem.asCheck(ID_SHOW_SECONDS, "Vaqtni soniyagacha ko'rsatish").setChecked(AbugramConfig.showSeconds));
+        items.add(UItem.asCheck(ID_SHOW_IDS, "Profilda ID ko'rsatish").setChecked(AbugramConfig.showIds));
+        items.add(UItem.asShadow(null));
+
+        items.add(UItem.asHeader("Qo'ng'iroqlar / Звонки"));
+        items.add(UItem.asCheck(ID_CONFIRM_CALLS, "Qo'ng'iroqdan oldin so'rash").setChecked(AbugramConfig.confirmCalls));
         items.add(UItem.asShadow(null));
 
         items.add(UItem.asHeader("VPN'siz ulanish / Без VPN"));
         items.add(UItem.asButton(ID_PROXY, 0, "Proxy ro'yxati va almashtirish"));
-        items.add(UItem.asShadow("Abugram o'zi ishlaydigan proxy'ni topadi va bloklansa keyingisiga o'tadi. " +
+        boolean viaRelay = SharedConfig.currentProxy != null && "127.0.0.1".equals(SharedConfig.currentProxy.settings.getAddress());
+        items.add(UItem.asShadow(viaRelay
+                ? "Hozir: Abugram relay orqali (oddiy HTTPS so'rovlar). VPN kerak emas."
+                : "Abugram Telegram'ga o'zining relay'i orqali oddiy HTTPS so'rovlar bilan ulanadi. " +
                 (SharedConfig.currentProxy != null ? "Hozir: " + SharedConfig.currentProxy.settings.getAddress() : "")));
     }
 
@@ -82,6 +94,13 @@ public class AbugramSettingsActivity extends UniversalFragment {
                 break;
             case ID_SHOW_IDS:
                 value = AbugramConfig.showIds = !AbugramConfig.showIds;
+                break;
+            case ID_SHOW_SECONDS:
+                value = AbugramConfig.showSeconds = !AbugramConfig.showSeconds;
+                LocaleController.getInstance().abugramResetFormatterDay();
+                break;
+            case ID_CONFIRM_CALLS:
+                value = AbugramConfig.confirmCalls = !AbugramConfig.confirmCalls;
                 break;
             case ID_PROXY:
                 presentFragment(new ProxyListActivity());

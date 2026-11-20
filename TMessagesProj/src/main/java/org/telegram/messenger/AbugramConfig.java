@@ -23,6 +23,8 @@ public class AbugramConfig {
     public static boolean hideSponsored = true;
     public static boolean hideStories;
     public static boolean showIds;
+    public static boolean showSeconds = true;
+    public static boolean confirmCalls = true;
 
     private static boolean loaded;
 
@@ -44,6 +46,8 @@ public class AbugramConfig {
         hideSponsored = p.getBoolean("hideSponsored", true);
         hideStories = p.getBoolean("hideStories", false);
         showIds = p.getBoolean("showIds", false);
+        showSeconds = p.getBoolean("showSeconds", true);
+        confirmCalls = p.getBoolean("confirmCalls", true);
     }
 
     public static synchronized void save() {
@@ -56,6 +60,8 @@ public class AbugramConfig {
                 .putBoolean("hideSponsored", hideSponsored)
                 .putBoolean("hideStories", hideStories)
                 .putBoolean("showIds", showIds)
+                .putBoolean("showSeconds", showSeconds)
+                .putBoolean("confirmCalls", confirmCalls)
                 .apply();
     }
 

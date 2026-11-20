@@ -36,6 +36,11 @@ public class AbugramProxy {
             "https://fastly.jsdelivr.net/gh/Abdulaziz0196/Telegram-iOS@master/abugram/proxies.txt"
     };
     private static final int MAX_PROXIES = 40;
+    /** The Abugram relay (Cloudflare Worker) that the local bridge sends Telegram's traffic through as HTTPS. */
+    private static final String RELAY = "https://winter-cake-2d11.tashlanow.workers.dev";
+    private static final int BRIDGE_PORT = 19050;
+    private static AbugramRelayBridge bridge;
+    private static int bridgePort;
     private static final String PREFS = "abugram_proxy";
     private static final String KEY_MANAGED = "managed";
     private static final String KEY_INITIALIZED = "initialized";
@@ -76,7 +81,17 @@ public class AbugramProxy {
             return;
         }
         started = true;
-        Utilities.globalQueue.postRunnable(AbugramProxy::loadAndApply);
+        Utilities.globalQueue.postRunnable(() -> {
+            try {
+                bridge = new AbugramRelayBridge(RELAY, FileLog::d);
+                bridgePort = bridge.start(BRIDGE_PORT);
+            } catch (Throwable e) {
+                FileLog.e(e);
+                bridge = null;
+                bridgePort = 0;
+            }
+            loadAndApply();
+        });
     }
 
     private static void loadAndApply() {
@@ -170,6 +185,18 @@ public class AbugramProxy {
                 SharedConfig.deleteProxy(info);
             }
         }
+        SharedConfig.ProxyInfo bridgeInfo = null;
+        if (bridgePort > 0) {
+            ProxySettings bridgeSettings = ProxySettings.builder()
+                    .setType(ProxySettings.Type.SOCKS5)
+                    .setAddress("127.0.0.1")
+                    .setPort(bridgePort)
+                    .setUser("")
+                    .setPassword("")
+                    .build();
+            newKeys.add(key(bridgeSettings));
+            bridgeInfo = SharedConfig.addProxy(new SharedConfig.ProxyInfo(bridgeSettings));
+        }
         ArrayList<SharedConfig.ProxyInfo> managed = new ArrayList<>();
         for (ProxySettings settings : servers) {
             managed.add(SharedConfig.addProxy(new SharedConfig.ProxyInfo(settings)));
@@ -182,6 +209,16 @@ public class AbugramProxy {
         boolean currentIsUsers = current != null && !newKeys.contains(key(current.settings)) && !previouslyManaged.contains(key(current.settings));
         if ((initialized && !enabled) || (enabled && currentIsUsers)) {
             NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.proxySettingsChanged);
+            return;
+        }
+
+        if (bridgeInfo != null) {
+            // The relay bridge carries everything as HTTPS through the Abugram relay; the MTProxy list stays in the
+            // proxy settings for picking by hand. Rotation would move away from the bridge, so it is off.
+            SharedConfig.proxyRotationEnabled = false;
+            SharedConfig.saveConfig();
+            select(bridgeInfo);
+            prefs.edit().putBoolean(KEY_INITIALIZED, true).apply();
             return;
         }
 
