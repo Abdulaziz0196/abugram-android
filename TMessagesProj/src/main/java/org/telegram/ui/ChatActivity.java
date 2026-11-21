@@ -645,6 +645,9 @@ public class ChatActivity extends BaseFragment implements
     private AnimatedTextView searchExpandList;
     private AnimatedTextView searchOtherButton;
     private ChatActionCell floatingDateView;
+    // Abugram: the ad card at the top of the chat, and the height it takes from the message list
+    private AbugramAdCard abugramAdView;
+    private int abugramAdHeight;
     private TopicSeparator.Cell floatingTopicSeparator;
     private float intoTopViewTop;
     private ChatActionCell infoTopView;
@@ -7152,6 +7155,14 @@ public class ChatActivity extends BaseFragment implements
         floatingDateView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         floatingDateView.setInvalidateColors(true);
         contentView.addView(floatingDateView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 4, 0, 0));
+        if (chatMode == MODE_DEFAULT && parentChatActivity == null) {
+            abugramAdView = new AbugramAdCard(context, () -> {
+                abugramAdHeight = abugramAdView.getVisibility() == View.VISIBLE ? dp(AbugramAdCard.RESERVED_DP) : 0;
+                invalidateChatListViewTopPadding();
+            });
+            contentView.addView(abugramAdView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, AbugramAdCard.CARD_DP, Gravity.TOP, 8, 4, 8, 0));
+            abugramAdView.load();
+        }
         floatingDateView.setOnActionClickListener(view -> {
             if (floatingDateView.getAlpha() == 0 || actionBar.isActionModeShowed() || isReport()) {
                 return;
@@ -12448,7 +12459,8 @@ public class ChatActivity extends BaseFragment implements
         }
         float pinnedViewH = getTopPanelHeightWithPadding(dp(7))
             + (actionBarSearchTags != null ? dp((28 + 7) * actionBarSearchTags.shownT) : 0)
-            + (dp(36 + 7) * getHashtagTabsShownT());
+            + (dp(36 + 7) * getHashtagTabsShownT())
+            + abugramAdHeight;
 
         float oldPadding = chatListViewPaddingTop;
         chatListViewPaddingTop = dp(4) + contentPaddingTop + (paddingTopHeight = pinnedViewH)
@@ -12459,6 +12471,9 @@ public class ChatActivity extends BaseFragment implements
         chatListViewPaddingTop += blurredViewTopOffset;
         chatListViewPaddingVisibleOffset = 0;
         chatListViewPaddingTop += contentPanTranslation;
+        if (abugramAdView != null) {
+            abugramAdView.setTranslationY(chatListView.getTranslationY() + chatListViewPaddingTop - abugramAdHeight);
+        }
 
         float searchExpandOffset = 0;
         if (searchExpandProgress != 0 && chatActivityEnterView != null && chatActivityEnterView.getVisibility() == View.VISIBLE) {
