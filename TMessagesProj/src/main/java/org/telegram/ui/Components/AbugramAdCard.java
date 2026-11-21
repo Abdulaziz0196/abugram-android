@@ -179,10 +179,19 @@ public class AbugramAdCard extends FrameLayout {
         });
     }
 
+    private boolean adShown;
+
+    /** Whether there is an ad to show; inside the chat's top panel the panel itself shows and hides the view. */
+    public boolean isAdShown() {
+        return adShown;
+    }
+
     private void setShown(boolean shown) {
-        int visibility = shown ? VISIBLE : GONE;
-        if (getVisibility() != visibility) {
-            setVisibility(visibility);
+        if (adShown != shown) {
+            adShown = shown;
+            if (!(getParent() instanceof AnimatedLinearLayout)) {
+                setVisibility(shown ? VISIBLE : GONE);
+            }
             if (onVisibilityChanged != null) {
                 onVisibilityChanged.run();
             }

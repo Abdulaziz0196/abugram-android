@@ -647,7 +647,6 @@ public class ChatActivity extends BaseFragment implements
     private ChatActionCell floatingDateView;
     // Abugram: the ad card at the top of the chat, and the height it takes from the message list
     private AbugramAdCard abugramAdView;
-    private int abugramAdHeight;
     private TopicSeparator.Cell floatingTopicSeparator;
     private float intoTopViewTop;
     private ChatActionCell infoTopView;
@@ -7155,14 +7154,18 @@ public class ChatActivity extends BaseFragment implements
         floatingDateView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         floatingDateView.setInvalidateColors(true);
         contentView.addView(floatingDateView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 4, 0, 0));
-        if (chatMode == MODE_DEFAULT && parentChatActivity == null) {
+        if (chatMode == MODE_DEFAULT && parentChatActivity == null && topPanelLayout != null) {
+            // Abugram ad: the last row of the top panel, so it always sits under the pinned message / music bar,
+            // or directly under the chat title when there are none.
             abugramAdView = new AbugramAdCard(context, () -> {
-                abugramAdHeight = abugramAdView.getVisibility() == View.VISIBLE ? dp(AbugramAdCard.RESERVED_DP) : 0;
-                invalidateChatListViewTopPadding();
+                if (topPanelLayout != null && abugramAdView != null) {
+                    topPanelLayout.setViewVisible(abugramAdView, abugramAdView.isAdShown());
+                }
             });
-            contentView.addView(abugramAdView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, AbugramAdCard.CARD_DP, Gravity.TOP, 8, 4, 8, 0));
+            topPanelLayout.addView(abugramAdView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, AbugramAdCard.CARD_DP));
+            topPanelLayout.setPriority(abugramAdView, 100);
+            topPanelLayout.setDebugName(abugramAdView, "abugram ad");
             abugramAdView.load();
-            contentView.getViewTreeObserver().addOnPreDrawListener(() -> { abugramPlaceAd(); return true; });
         }
         floatingDateView.setOnActionClickListener(view -> {
             if (floatingDateView.getAlpha() == 0 || actionBar.isActionModeShowed() || isReport()) {
@@ -12454,30 +12457,13 @@ public class ChatActivity extends BaseFragment implements
         }
     }
 
-    // The ad card is fixed under the top bars: the title, then the pinned message / music bar when
-    // they are shown. It is measured from the real views each frame, not from the list padding.
-    private void abugramPlaceAd() {
-        if (abugramAdView == null || actionBar == null) {
-            return;
-        }
-        float bottom = actionBar.getY() + actionBar.getMeasuredHeight();
-        if (topPanelLayout != null) {
-            float panelH = topPanelLayout.getAnimatedHeightWithPadding(dp(7));
-            if (panelH > dp(8)) {
-                bottom = Math.max(bottom, topPanelLayout.getY() + panelH - dp(2));
-            }
-        }
-        abugramAdView.setTranslationY(bottom);
-    }
-
     private void updateChatListViewTopPadding() {
         if (!invalidateChatListViewTopPadding || chatListView == null || (fixedKeyboardHeight > 0 && searchExpandProgress == 0)) {
             return;
         }
         float pinnedViewH = getTopPanelHeightWithPadding(dp(7))
             + (actionBarSearchTags != null ? dp((28 + 7) * actionBarSearchTags.shownT) : 0)
-            + (dp(36 + 7) * getHashtagTabsShownT())
-            + abugramAdHeight;
+            + (dp(36 + 7) * getHashtagTabsShownT());
 
         float oldPadding = chatListViewPaddingTop;
         chatListViewPaddingTop = dp(4) + contentPaddingTop + (paddingTopHeight = pinnedViewH)
@@ -12488,7 +12474,6 @@ public class ChatActivity extends BaseFragment implements
         chatListViewPaddingTop += blurredViewTopOffset;
         chatListViewPaddingVisibleOffset = 0;
         chatListViewPaddingTop += contentPanTranslation;
-        abugramPlaceAd();
 
         float searchExpandOffset = 0;
         if (searchExpandProgress != 0 && chatActivityEnterView != null && chatActivityEnterView.getVisibility() == View.VISIBLE) {
