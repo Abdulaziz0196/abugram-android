@@ -64,6 +64,23 @@ public class AbugramSettingsActivity extends UniversalFragment {
         items.add(UItem.asCheck(ID_CONFIRM_CALLS, "Qo'ng'iroqdan oldin so'rash").setChecked(AbugramConfig.confirmCalls));
         items.add(UItem.asShadow(null));
 
+        items.add(UItem.asHeader("Diagnostika / Диагностика"));
+        java.util.List<org.telegram.messenger.AbugramRelayBridge.Stat> stats = org.telegram.messenger.AbugramRelayBridge.getStats();
+        if (stats.isEmpty()) {
+            items.add(UItem.asShadow("Hali so'rov yo'q."));
+        } else {
+            StringBuilder b = new StringBuilder();
+            int count = 0;
+            for (org.telegram.messenger.AbugramRelayBridge.Stat st : stats) {
+                if (count++ >= 20) break;
+                b.append("DC").append(st.dc).append(" · ").append(st.millis).append(" ms · ⬆")
+                        .append(st.bytesOut / 1024).append(" KB ⬇").append(st.bytesIn / 1024).append(" KB · ")
+                        .append(st.result).append('\n');
+            }
+            items.add(UItem.asShadow(b.toString().trim()));
+        }
+        items.add(UItem.asShadow("Ovozli yoki video xabar yuborilmasa, shu ro'yxatning skrinshotini yuboring: qaysi so'rov uzoq ketayotganini ko'rsatadi."));
+
         items.add(UItem.asHeader("VPN'siz ulanish / Без VPN"));
         items.add(UItem.asButton(ID_PROXY, 0, "Proxy ro'yxati va almashtirish"));
         boolean viaRelay = SharedConfig.currentProxy != null && "127.0.0.1".equals(SharedConfig.currentProxy.settings.getAddress());

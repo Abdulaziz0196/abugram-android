@@ -41,6 +41,46 @@ public class AbugramRelayBridge {
     private static final int TAG_INTERMEDIATE = 0xeeeeeeee;
     private static final int TAG_PADDED = 0xdddddddd;
 
+    /** One finished request through the relay, for the diagnostics list in Settings → Abugram. */
+    public static class Stat {
+        public final long time;
+        public final int dc;
+        public final int bytesOut;
+        public final int bytesIn;
+        public final long millis;
+        public final String result;
+
+        Stat(int dc, int bytesOut, int bytesIn, long millis, String result) {
+            this.time = System.currentTimeMillis();
+            this.dc = dc;
+            this.bytesOut = bytesOut;
+            this.bytesIn = bytesIn;
+            this.millis = millis;
+            this.result = result;
+        }
+    }
+
+    private static final int KEEP_STATS = 40;
+    private static final java.util.ArrayDeque<Stat> STATS = new java.util.ArrayDeque<>();
+
+    private static void record(Stat stat) {
+        synchronized (STATS) {
+            STATS.addLast(stat);
+            while (STATS.size() > KEEP_STATS) {
+                STATS.removeFirst();
+            }
+        }
+    }
+
+    /** The latest requests, newest first. */
+    public static java.util.List<Stat> getStats() {
+        synchronized (STATS) {
+            java.util.ArrayList<Stat> list = new java.util.ArrayList<>(STATS);
+            java.util.Collections.reverse(list);
+            return list;
+        }
+    }
+
     private final String relayBase;
     private final Log log;
     private ServerSocket server;
@@ -61,6 +101,8 @@ public class AbugramRelayBridge {
         if (server != null) {
             return server.getLocalPort();
         }
+        // The default of 5 connections per host holds back the many parallel parts of a file upload.
+        System.setProperty("http.maxConnections", "24");
         ServerSocket s = new ServerSocket();
         s.setReuseAddress(true);
         try {
@@ -169,6 +211,7 @@ public class AbugramRelayBridge {
         private Cipher encrypt; // us -> client
         private int tag;
         private String url;
+        private int dcOfSession;
         private volatile boolean closed;
 
         Session(Socket socket, InputStream in, OutputStream out, String address) {
@@ -205,6 +248,7 @@ public class AbugramRelayBridge {
             if (dc < 1 || dc > 5) {
                 throw new IOException("unknown datacenter for " + address);
             }
+            dcOfSession = dc;
             url = relayBase + "/" + HOSTS[dc - 1] + "/apiw1";
             log("connection to DC" + dc + " via " + address);
 
@@ -254,6 +298,9 @@ public class AbugramRelayBridge {
 
         private void post(byte[] message) {
             HttpURLConnection c = null;
+            final long started = System.currentTimeMillis();
+            int received = 0;
+            String result = "xato";
             try {
                 c = (HttpURLConnection) new URL(url).openConnection();
                 c.setRequestMethod("POST");
@@ -266,8 +313,11 @@ public class AbugramRelayBridge {
                     o.write(message);
                 }
                 int status = c.getResponseCode();
+                result = "HTTP " + status;
                 if (status == 200) {
                     byte[] body = readAll(c.getInputStream());
+                    received = body.length;
+                    result = "ok";
                     if (body.length > 0) send(body);
                 } else if (status == 404) {
                     // Telegram answers an unknown auth key with HTTP 404, and TCP clients expect the code -404
@@ -281,9 +331,11 @@ public class AbugramRelayBridge {
                 }
             } catch (Throwable e) {
                 log("request failed: " + e);
+                result = e instanceof java.net.SocketTimeoutException ? "vaqt tugadi" : "tarmoq xatosi";
                 close();
             } finally {
                 if (c != null) c.disconnect();
+                record(new Stat(dcOfSession, message.length, received, System.currentTimeMillis() - started, result));
             }
         }
 
