@@ -294,7 +294,9 @@ void ConnectionsManager::select() {
     }
     if (datacenter != nullptr) {
         if (datacenter->hasAuthKey(ConnectionTypeGeneric, 1)) {
-            if (llabs(now - lastPingTime) >= (testBackend ? 2000 : 19000)) {
+            // Abugram: through the local relay bridge (a SOCKS5 proxy on 127.0.0.1) every packet is an HTTPS request and
+            // the server can only answer, never push, so the ping that collects updates goes out every 4 s, not 19 s
+            if (llabs(now - lastPingTime) >= (testBackend ? 2000 : (proxyAddress == "127.0.0.1" ? 4000 : 19000))) {
                 lastPingTime = now;
                 sendPing(datacenter, false);
             }
