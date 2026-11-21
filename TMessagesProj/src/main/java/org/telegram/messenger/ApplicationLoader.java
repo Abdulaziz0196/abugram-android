@@ -367,6 +367,7 @@ public class ApplicationLoader extends Application {
         ProxyRotationController.init();
         AbugramConfig.load();
         AbugramProxy.start(); // Abugram: built-in proxy, works without a VPN
+        AbugramAccess.start(); // Abugram: what this account may use, and the daily user count
 
         //if (BuildConfig.DEBUG_PRIVATE_VERSION) {
         //    Choreographer60FpsContent.getInstance().addFrameCallback(debugEverySecondChecks, 1);

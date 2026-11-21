@@ -20,7 +20,11 @@ public class AbugramConfig {
     public static boolean ghostOnline;
     public static boolean ghostStories;
     public static boolean keepDeleted;
-    public static boolean hideSponsored = true;
+    /** Telegram's API terms ask clients to show its sponsored messages, so they are never held back. */
+    public static boolean hideSponsored = false;
+    /** Set from the Abugram relay (/access): whether the Abugram admin allowed this account ghost mode / the admin page. */
+    public static boolean ghostAllowed;
+    public static boolean isAdmin;
     public static boolean hideStories;
     public static boolean showIds;
     public static boolean showSeconds = true;
@@ -43,7 +47,10 @@ public class AbugramConfig {
         ghostOnline = p.getBoolean("ghostOnline", false);
         ghostStories = p.getBoolean("ghostStories", false);
         keepDeleted = p.getBoolean("keepDeleted", false);
-        hideSponsored = p.getBoolean("hideSponsored", true);
+        hideSponsored = false;
+        SharedPreferences a = ApplicationLoader.applicationContext.getSharedPreferences("abugram_access", Activity.MODE_PRIVATE);
+        ghostAllowed = a.getBoolean("ghost", false);
+        isAdmin = a.getBoolean("admin", false);
         hideStories = p.getBoolean("hideStories", false);
         showIds = p.getBoolean("showIds", false);
         showSeconds = p.getBoolean("showSeconds", true);
@@ -57,7 +64,6 @@ public class AbugramConfig {
                 .putBoolean("ghostOnline", ghostOnline)
                 .putBoolean("ghostStories", ghostStories)
                 .putBoolean("keepDeleted", keepDeleted)
-                .putBoolean("hideSponsored", hideSponsored)
                 .putBoolean("hideStories", hideStories)
                 .putBoolean("showIds", showIds)
                 .putBoolean("showSeconds", showSeconds)
@@ -71,25 +77,23 @@ public class AbugramConfig {
      */
     public static boolean filterRequest(TLObject object) {
         load();
-        if (ghostRead && (object instanceof TLRPC.TL_messages_readHistory
+        boolean ghost = ghostAllowed;
+        if (ghost && ghostRead && (object instanceof TLRPC.TL_messages_readHistory
                 || object instanceof TLRPC.TL_channels_readHistory
                 || object instanceof TLRPC.TL_messages_readDiscussion
                 || object instanceof TLRPC.TL_messages_readMessageContents
                 || object instanceof TLRPC.TL_channels_readMessageContents)) {
             return true;
         }
-        if (ghostTyping && object instanceof TLRPC.TL_messages_setTyping) {
+        if (ghost && ghostTyping && object instanceof TLRPC.TL_messages_setTyping) {
             return true;
         }
-        if (ghostOnline && object instanceof TL_account.updateStatus) {
+        if (ghost && ghostOnline && object instanceof TL_account.updateStatus) {
             ((TL_account.updateStatus) object).offline = true;
             return false;
         }
-        if (ghostStories && (object instanceof TL_stories.TL_stories_readStories
+        if (ghost && ghostStories && (object instanceof TL_stories.TL_stories_readStories
                 || object instanceof TL_stories.TL_stories_incrementStoryViews)) {
-            return true;
-        }
-        if (hideSponsored && object instanceof TLRPC.TL_messages_getSponsoredMessages) {
             return true;
         }
         return false;

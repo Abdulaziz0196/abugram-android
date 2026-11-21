@@ -37,7 +37,7 @@ public class AbugramProxy {
     };
     private static final int MAX_PROXIES = 40;
     /** The Abugram relay (Cloudflare Worker) that the local bridge sends Telegram's traffic through as HTTPS. */
-    private static final String RELAY = "https://winter-cake-2d11.tashlanow.workers.dev";
+    static final String RELAY = "https://winter-cake-2d11.tashlanow.workers.dev";
     private static final int BRIDGE_PORT = 19050;
     private static AbugramRelayBridge bridge;
     private static int bridgePort;

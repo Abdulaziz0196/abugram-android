@@ -20,10 +20,10 @@ public class AbugramSettingsActivity extends UniversalFragment {
     private static final int ID_GHOST_ONLINE = 3;
     private static final int ID_GHOST_STORIES = 4;
     private static final int ID_KEEP_DELETED = 5;
-    private static final int ID_HIDE_SPONSORED = 6;
     private static final int ID_HIDE_STORIES = 7;
     private static final int ID_SHOW_IDS = 8;
     private static final int ID_PROXY = 9;
+    private static final int ID_ADMIN = 12;
     private static final int ID_SHOW_SECONDS = 10;
     private static final int ID_CONFIRM_CALLS = 11;
 
@@ -36,16 +36,22 @@ public class AbugramSettingsActivity extends UniversalFragment {
     protected void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
         AbugramConfig.load();
 
-        items.add(UItem.asHeader("Ko'rinmas rejim / Режим невидимки"));
-        items.add(UItem.asCheck(ID_GHOST_READ, "\"O'qildi\" belgisini yubormaslik").setChecked(AbugramConfig.ghostRead));
-        items.add(UItem.asCheck(ID_GHOST_TYPING, "\"Yozmoqda...\" ko'rsatmaslik").setChecked(AbugramConfig.ghostTyping));
-        items.add(UItem.asCheck(ID_GHOST_ONLINE, "Onlayn ko'rinmaslik").setChecked(AbugramConfig.ghostOnline));
-        items.add(UItem.asCheck(ID_GHOST_STORIES, "Story'larni yashirin ko'rish").setChecked(AbugramConfig.ghostStories));
-        items.add(UItem.asShadow("Bu sozlamalar Telegram qoidalariga zid bo'lishi mumkin: ehtiyot bo'lib ishlating."));
+        if (AbugramConfig.isAdmin) {
+            items.add(UItem.asButton(ID_ADMIN, 0, "Admin panel"));
+            items.add(UItem.asShadow("Reklamalar, statistika va ruxsat berilganlar."));
+        }
+
+        if (AbugramConfig.ghostAllowed) {
+            items.add(UItem.asHeader("Ko'rinmas rejim / Режим невидимки"));
+            items.add(UItem.asCheck(ID_GHOST_READ, "\"O'qildi\" belgisini yubormaslik").setChecked(AbugramConfig.ghostRead));
+            items.add(UItem.asCheck(ID_GHOST_TYPING, "\"Yozmoqda...\" ko'rsatmaslik").setChecked(AbugramConfig.ghostTyping));
+            items.add(UItem.asCheck(ID_GHOST_ONLINE, "Onlayn ko'rinmaslik").setChecked(AbugramConfig.ghostOnline));
+            items.add(UItem.asCheck(ID_GHOST_STORIES, "Story'larni yashirin ko'rish").setChecked(AbugramConfig.ghostStories));
+            items.add(UItem.asShadow("Bu sozlamalar Telegram qoidalariga zid bo'lishi mumkin: ehtiyot bo'lib ishlating."));
+        }
 
         items.add(UItem.asHeader("Xabarlar / Сообщения"));
         items.add(UItem.asCheck(ID_KEEP_DELETED, "O'chirilgan xabarlarni saqlab qolish").setChecked(AbugramConfig.keepDeleted));
-        items.add(UItem.asCheck(ID_HIDE_SPONSORED, "Homiy (reklama) xabarlarini yashirish").setChecked(AbugramConfig.hideSponsored));
         items.add(UItem.asShadow("O'chirilgan xabarlar faqat shu telefonda, ilova ochiq paytda kelgan o'chirishlar uchun saqlanadi."));
 
         items.add(UItem.asHeader("Ko'rinish / Внешний вид"));
@@ -86,9 +92,6 @@ public class AbugramSettingsActivity extends UniversalFragment {
             case ID_KEEP_DELETED:
                 value = AbugramConfig.keepDeleted = !AbugramConfig.keepDeleted;
                 break;
-            case ID_HIDE_SPONSORED:
-                value = AbugramConfig.hideSponsored = !AbugramConfig.hideSponsored;
-                break;
             case ID_HIDE_STORIES:
                 value = AbugramConfig.hideStories = !AbugramConfig.hideStories;
                 break;
@@ -102,6 +105,9 @@ public class AbugramSettingsActivity extends UniversalFragment {
             case ID_CONFIRM_CALLS:
                 value = AbugramConfig.confirmCalls = !AbugramConfig.confirmCalls;
                 break;
+            case ID_ADMIN:
+                org.telegram.messenger.browser.Browser.openUrl(getParentActivity(), "https://abdulaziz0196.github.io/tashlanov.ru/abugram/admin.html");
+                return;
             case ID_PROXY:
                 presentFragment(new ProxyListActivity());
                 return;
