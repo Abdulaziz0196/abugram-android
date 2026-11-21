@@ -7162,6 +7162,7 @@ public class ChatActivity extends BaseFragment implements
             });
             contentView.addView(abugramAdView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, AbugramAdCard.CARD_DP, Gravity.TOP, 8, 4, 8, 0));
             abugramAdView.load();
+            contentView.getViewTreeObserver().addOnPreDrawListener(() -> { abugramPlaceAd(); return true; });
         }
         floatingDateView.setOnActionClickListener(view -> {
             if (floatingDateView.getAlpha() == 0 || actionBar.isActionModeShowed() || isReport()) {
@@ -12453,6 +12454,22 @@ public class ChatActivity extends BaseFragment implements
         }
     }
 
+    // The ad card is fixed under the top bars: the title, then the pinned message / music bar when
+    // they are shown. It is measured from the real views each frame, not from the list padding.
+    private void abugramPlaceAd() {
+        if (abugramAdView == null || actionBar == null) {
+            return;
+        }
+        float bottom = actionBar.getY() + actionBar.getMeasuredHeight();
+        if (topPanelLayout != null) {
+            float panelH = topPanelLayout.getAnimatedHeightWithPadding(dp(7));
+            if (panelH > dp(8)) {
+                bottom = Math.max(bottom, topPanelLayout.getY() + panelH - dp(2));
+            }
+        }
+        abugramAdView.setTranslationY(bottom);
+    }
+
     private void updateChatListViewTopPadding() {
         if (!invalidateChatListViewTopPadding || chatListView == null || (fixedKeyboardHeight > 0 && searchExpandProgress == 0)) {
             return;
@@ -12471,9 +12488,7 @@ public class ChatActivity extends BaseFragment implements
         chatListViewPaddingTop += blurredViewTopOffset;
         chatListViewPaddingVisibleOffset = 0;
         chatListViewPaddingTop += contentPanTranslation;
-        if (abugramAdView != null) {
-            abugramAdView.setTranslationY(chatListView.getTranslationY() + chatListViewPaddingTop - abugramAdHeight);
-        }
+        abugramPlaceAd();
 
         float searchExpandOffset = 0;
         if (searchExpandProgress != 0 && chatActivityEnterView != null && chatActivityEnterView.getVisibility() == View.VISIBLE) {
