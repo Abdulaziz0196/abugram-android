@@ -18902,7 +18902,7 @@ public class MessagesController extends BaseController implements NotificationCe
                     arrayList = new ArrayList<>();
                     deletedMessages.put(0, arrayList);
                 }
-                if (!AbugramConfig.keepDeleted) {
+                if (!AbugramConfig.keepDeletedActive()) {
                     arrayList.addAll(update.messages);
                 }
             } else if (baseUpdate instanceof TL_update.TL_updateDeleteQuickReplyMessages) {
@@ -19434,7 +19434,7 @@ public class MessagesController extends BaseController implements NotificationCe
                     arrayList = new ArrayList<>();
                     deletedMessages.put(dialogId, arrayList);
                 }
-                if (!AbugramConfig.keepDeleted) {
+                if (!AbugramConfig.keepDeletedActive()) {
                     arrayList.addAll(update.messages);
                 }
             } else if (baseUpdate instanceof TL_update.TL_updateChannel) {

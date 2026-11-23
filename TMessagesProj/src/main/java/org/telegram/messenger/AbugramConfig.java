@@ -75,6 +75,11 @@ public class AbugramConfig {
      * Called for every request before it is sent. Returns true when the request must not be sent at all.
      * May adjust the request in place (going online is turned into staying offline).
      */
+    /** Keeping deleted messages is one of the extra features: only for accounts the Abugram admin allowed. */
+    public static boolean keepDeletedActive() {
+        return keepDeleted && ghostAllowed;
+    }
+
     public static boolean filterRequest(TLObject object) {
         load();
         boolean ghost = ghostAllowed;

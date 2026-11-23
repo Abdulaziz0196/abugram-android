@@ -50,9 +50,11 @@ public class AbugramSettingsActivity extends UniversalFragment {
             items.add(UItem.asShadow("Bu sozlamalar Telegram qoidalariga zid bo'lishi mumkin: ehtiyot bo'lib ishlating."));
         }
 
-        items.add(UItem.asHeader("Xabarlar / Сообщения"));
-        items.add(UItem.asCheck(ID_KEEP_DELETED, "O'chirilgan xabarlarni saqlab qolish").setChecked(AbugramConfig.keepDeleted));
-        items.add(UItem.asShadow("O'chirilgan xabarlar faqat shu telefonda, ilova ochiq paytda kelgan o'chirishlar uchun saqlanadi."));
+        if (AbugramConfig.ghostAllowed) {
+            items.add(UItem.asHeader("Xabarlar / Сообщения"));
+            items.add(UItem.asCheck(ID_KEEP_DELETED, "O'chirilgan xabarlarni saqlab qolish").setChecked(AbugramConfig.keepDeleted));
+            items.add(UItem.asShadow("O'chirilgan xabarlar faqat shu telefonda, ilova ochiq paytda kelgan o'chirishlar uchun saqlanadi."));
+        }
 
         items.add(UItem.asHeader("Ko'rinish / Внешний вид"));
         items.add(UItem.asCheck(ID_HIDE_STORIES, "Story panelini yashirish").setChecked(AbugramConfig.hideStories));
