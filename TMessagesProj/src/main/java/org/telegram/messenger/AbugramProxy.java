@@ -76,6 +76,12 @@ public class AbugramProxy {
     private static boolean started;
     private static boolean chosen;
 
+    /** Whether Telegram currently connects through the Abugram relay bridge. */
+    public static boolean viaRelay() {
+        return SharedConfig.currentProxy != null && SharedConfig.isProxyEnabled()
+                && "127.0.0.1".equals(SharedConfig.currentProxy.settings.getAddress());
+    }
+
     public static void start() {
         if (started) {
             return;

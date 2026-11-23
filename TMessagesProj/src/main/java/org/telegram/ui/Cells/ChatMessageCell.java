@@ -15526,6 +15526,17 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             }
             w = (int) Math.ceil(Theme.chat_infoPaint.measureText(str));
         }
+        if (currentMessageObject != null && str.indexOf('/') >= 0) {
+            // Abugram: how long the rest of a large file takes
+            String eta = AbugramTiming.eta(currentMessageObject.getDialogId() + ":" + currentMessageObject.getId(), loadedSize, totalSize);
+            if (eta != null) {
+                int withEta = (int) Math.ceil(Theme.chat_infoPaint.measureText(str + eta));
+                if (!fullWidth || withEta <= backgroundWidth - dp(48)) {
+                    str = str + eta;
+                    w = withEta;
+                }
+            }
+        }
         loadingProgressLayout = new StaticLayout(str, Theme.chat_infoPaint, w, Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
     }
 

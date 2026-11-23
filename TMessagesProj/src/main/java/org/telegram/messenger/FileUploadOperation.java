@@ -338,7 +338,8 @@ public class FileUploadOperation {
                 }
                 maxRequestsCount = Math.max(1, (slowNetwork ? maxUploadingSlowNetworkKBytes : maxUploadingKBytes) / uploadChunkSize);
                 // TDLib uploads premium files over 8 sessions.
-                uploadConnectionsCount = AccountInstance.getInstance(currentAccount).getUserConfig().isPremium() ? ConnectionsManager.UploadConnectionsCountPremium : 4;
+                // Abugram: through the relay every packet is one HTTPS request, so more parallel connections finish a big file sooner
+                uploadConnectionsCount = AccountInstance.getInstance(currentAccount).getUserConfig().isPremium() || AbugramProxy.viaRelay() ? ConnectionsManager.UploadConnectionsCountPremium : 4;
 
                 if (isEncrypted) {
                     freeRequestIvs = new ArrayList<>(maxRequestsCount);
