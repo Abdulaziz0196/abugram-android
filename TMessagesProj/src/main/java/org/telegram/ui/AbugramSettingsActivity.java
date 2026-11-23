@@ -29,7 +29,7 @@ public class AbugramSettingsActivity extends UniversalFragment {
 
     @Override
     protected CharSequence getTitle() {
-        return "Abugram";
+        return "Xabarchi";
     }
 
     @Override
@@ -66,6 +66,9 @@ public class AbugramSettingsActivity extends UniversalFragment {
         items.add(UItem.asCheck(ID_CONFIRM_CALLS, "Qo'ng'iroqdan oldin so'rash").setChecked(AbugramConfig.confirmCalls));
         items.add(UItem.asShadow(null));
 
+        items.add(UItem.asHeader("Versiya / Версия"));
+        items.add(UItem.asShadow("Xabarchi " + org.telegram.messenger.AbugramVersion.name() + " (veb bilan bir xil raqam)"));
+
         items.add(UItem.asHeader("Diagnostika / Диагностика"));
         java.util.List<org.telegram.messenger.AbugramRelayBridge.Stat> stats = org.telegram.messenger.AbugramRelayBridge.getStats();
         if (stats.isEmpty()) {
@@ -87,8 +90,8 @@ public class AbugramSettingsActivity extends UniversalFragment {
         items.add(UItem.asButton(ID_PROXY, 0, "Proxy ro'yxati va almashtirish"));
         boolean viaRelay = SharedConfig.currentProxy != null && "127.0.0.1".equals(SharedConfig.currentProxy.settings.getAddress());
         items.add(UItem.asShadow(viaRelay
-                ? "Hozir: Abugram relay orqali (oddiy HTTPS so'rovlar). VPN kerak emas."
-                : "Abugram Telegram'ga o'zining relay'i orqali oddiy HTTPS so'rovlar bilan ulanadi. " +
+                ? "Hozir: Xabarchi relay orqali (oddiy HTTPS so'rovlar). VPN kerak emas."
+                : "Xabarchi Telegram'ga o'zining relay'i orqali oddiy HTTPS so'rovlar bilan ulanadi. " +
                 (SharedConfig.currentProxy != null ? "Hozir: " + SharedConfig.currentProxy.settings.getAddress() : "")));
     }
 

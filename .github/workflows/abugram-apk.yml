@@ -1,4 +1,4 @@
-name: Abugram APK
+name: Xabarchi APK
 
 on:
   workflow_dispatch:
@@ -54,27 +54,28 @@ jobs:
 
       - name: Build APK
         run: |
+          echo "${{ github.run_number }}" > TMessagesProj/src/main/assets/abugram_build.txt
           chmod +x gradlew
           ./gradlew --no-daemon --stacktrace -Dorg.gradle.jvmargs="-Xmx6g -XX:MaxMetaspaceSize=1g" \
             :TMessagesProj_AppStandalone:assembleAfatStandalone
           APK=$(find TMessagesProj_AppStandalone/build/outputs/apk -name "*.apk" | head -1)
           if [ -z "$APK" ]; then echo "::error::No APK produced"; exit 1; fi
-          mkdir -p out && cp "$APK" out/Abugram.apk && ls -lh out
+          mkdir -p out && cp "$APK" out/Xabarchi.apk && ls -lh out
           echo "APP_VERSION=$(grep APP_VERSION_NAME gradle.properties | cut -d= -f2)" >> $GITHUB_ENV
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Abugram-android-${{ github.run_number }}
-          path: out/Abugram.apk
+          name: Xabarchi-android-${{ github.run_number }}
+          path: out/Xabarchi.apk
           if-no-files-found: error
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: abugram-android-${{ github.run_number }}
-          name: Abugram for Android ${{ env.APP_VERSION }} (${{ github.run_number }})
+          name: Xabarchi for Android ${{ env.APP_VERSION }} (${{ github.run_number }})
           body: |
-            Abugram for Android ${{ env.APP_VERSION }}. Install Abugram.apk directly; it works next to the official Telegram app.
+            Xabarchi for Android ${{ env.APP_VERSION }}. Install Xabarchi.apk directly; it works next to the official Telegram app.
             Built-in proxies with automatic rotation, so it connects without a VPN where Telegram is blocked.
-          files: out/Abugram.apk
+          files: out/Xabarchi.apk

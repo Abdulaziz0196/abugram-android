@@ -55,6 +55,7 @@ public class AbugramAccess {
         try {
             fetchAccess(uid);
             hello(uid);
+            checkGate();
         } catch (Throwable e) {
             FileLog.e(e);
         }
@@ -70,7 +71,8 @@ public class AbugramAccess {
         JSONObject json = new JSONObject(body);
         boolean ghost = json.optBoolean("ghost", false);
         boolean admin = json.optBoolean("admin", false);
-        prefs().edit().putBoolean("ghost", ghost).putBoolean("admin", admin).apply();
+        boolean pro = json.optBoolean("pro", false);
+        prefs().edit().putBoolean("ghost", ghost).putBoolean("admin", admin).putBoolean("pro", pro).apply();
         AbugramConfig.ghostAllowed = ghost;
         AbugramConfig.isAdmin = admin;
     }
@@ -80,11 +82,49 @@ public class AbugramAccess {
         format.setTimeZone(TimeZone.getTimeZone("UTC"));
         String today = format.format(new Date());
         SharedPreferences p = ApplicationLoader.applicationContext.getSharedPreferences("abugram_hello", Activity.MODE_PRIVATE);
-        if (today.equals(p.getString("day" + uid, ""))) {
+        String version = AbugramVersion.name();
+        if (today.equals(p.getString("day" + uid, "")) && version.equals(p.getString("ver" + uid, ""))) {
             return;
         }
-        request("POST", AbugramProxy.RELAY + "/hello", "{\"uid\":" + uid + ",\"platform\":\"android\"}");
-        p.edit().putString("day" + uid, today).apply();
+        request("POST", AbugramProxy.RELAY + "/hello", "{\"uid\":" + uid + ",\"platform\":\"android\",\"version\":\"" + version + "\"}");
+        p.edit().putString("day" + uid, today).putString("ver" + uid, version).apply();
+    }
+
+    private static boolean gateShown;
+
+    /**
+     * What the Abugram admin set in the relay's /config: a minimum build (an update is required) or paid mode (accounts
+     * without a paid period, and not admin, must pay). Both are off by default: nothing is shown while the app is free.
+     */
+    private static void checkGate() throws Exception {
+        JSONObject c = new JSONObject(request("GET", AbugramProxy.RELAY + "/config", null));
+        int minBuild = c.optInt("minBuild", 0);
+        boolean paid = c.optBoolean("paid", false);
+        boolean pro = prefs().getBoolean("pro", false) || AbugramConfig.isAdmin;
+        boolean update = minBuild > 0 && AbugramVersion.build() < minBuild;
+        boolean pay = paid && !pro;
+        if (gateShown || !(update || pay)) {
+            return;
+        }
+        final String title = c.optString(update ? "updateTitle" : "payTitle", update ? "Yangilash kerak" : "Obuna kerak");
+        final String message = c.optString(update ? "updateMessage" : "payMessage", "");
+        final String url = c.optString("url", "https://abdulaziz0196.github.io/tashlanov.ru/abugram/");
+        gateShown = true;
+        AndroidUtilities.runOnUIThread(() -> {
+            org.telegram.ui.LaunchActivity activity = org.telegram.ui.LaunchActivity.instance;
+            if (activity == null) {
+                gateShown = false;
+                return;
+            }
+            org.telegram.ui.ActionBar.AlertDialog.Builder b = new org.telegram.ui.ActionBar.AlertDialog.Builder(activity);
+            b.setTitle(title);
+            b.setMessage(message);
+            b.setPositiveButton("Ochish", (d, w) -> org.telegram.messenger.browser.Browser.openUrl(activity, url));
+            org.telegram.ui.ActionBar.AlertDialog dialog = b.create();
+            dialog.setCanCancel(false);
+            dialog.setCanceledOnTouchOutside(false);
+            dialog.show();
+        });
     }
 
     private static String request(String method, String address, String json) throws Exception {

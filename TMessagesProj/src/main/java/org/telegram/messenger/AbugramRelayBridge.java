@@ -309,6 +309,7 @@ public class AbugramRelayBridge {
                 c.setConnectTimeout(15000);
                 c.setReadTimeout(45000);
                 c.setRequestProperty("Content-Type", "application/octet-stream");
+                c.setRequestProperty("X-Abugram-Build", String.valueOf(AbugramVersion.build())); // lets the relay ask old builds to update
                 c.setFixedLengthStreamingMode(message.length);
                 try (OutputStream o = c.getOutputStream()) {
                     o.write(message);
