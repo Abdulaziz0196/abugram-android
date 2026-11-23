@@ -299,6 +299,7 @@ public class AbugramRelayBridge {
         private void post(byte[] message) {
             HttpURLConnection c = null;
             final long started = System.currentTimeMillis();
+            boolean reuse = false; // a fully read answer leaves the HTTPS connection open for the next request: no new handshake
             int received = 0;
             String result = "xato";
             try {
@@ -318,6 +319,7 @@ public class AbugramRelayBridge {
                     byte[] body = readAll(c.getInputStream());
                     received = body.length;
                     result = "ok";
+                    reuse = true;
                     if (body.length > 0) send(body);
                 } else if (status == 404) {
                     // Telegram answers an unknown auth key with HTTP 404, and TCP clients expect the code -404
@@ -334,7 +336,7 @@ public class AbugramRelayBridge {
                 result = e instanceof java.net.SocketTimeoutException ? "vaqt tugadi" : "tarmoq xatosi";
                 close();
             } finally {
-                if (c != null) c.disconnect();
+                if (c != null && !reuse) c.disconnect();
                 record(new Stat(dcOfSession, message.length, received, System.currentTimeMillis() - started, result));
             }
         }

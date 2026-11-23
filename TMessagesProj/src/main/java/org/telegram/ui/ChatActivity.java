@@ -142,6 +142,7 @@ import com.google.zxing.common.detector.MathUtils;
 
 import org.telegram.PhoneFormat.PhoneFormat;
 import org.telegram.messenger.AccountInstance;
+import org.telegram.messenger.AbugramTiming;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.BotForumHelper;
@@ -23202,6 +23203,9 @@ public class ChatActivity extends BaseFragment implements
                 return;
             }
             Integer msgId = (Integer) args[0];
+            if (args[1] instanceof Integer && args[3] instanceof Long) {
+                AbugramTiming.sent((Long) args[3], msgId, (Integer) args[1]);
+            }
             MessageObject obj = messagesDict[0].get(msgId);
             if (isThreadChat() && pendingSendMessagesDict.size() > 0) {
                 MessageObject object = pendingSendMessagesDict.get(msgId);
