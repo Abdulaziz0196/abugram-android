@@ -470,6 +470,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         frameLayout.setClipToPadding(false);
         frameLayout.setClipChildren(false);
         setContentView(frameLayout);
+        org.telegram.ui.Components.AbugramSplash.show(this, frameLayout); // Xabarchi: the opening animation and chime
         rootAnimatedInsetsListener = new WindowAnimatedInsetsProvider(frameLayout);
         PipCoordinator.getInstance().onActivityCreate(this, createActivityVisibilityController(false));
 

@@ -26,6 +26,8 @@ public class AbugramSettingsActivity extends UniversalFragment {
     private static final int ID_ADMIN = 12;
     private static final int ID_SHOW_SECONDS = 10;
     private static final int ID_CONFIRM_CALLS = 11;
+    private static final int ID_SPLASH = 20;
+    private static final int ID_SPLASH_SOUND = 21;
 
     @Override
     protected CharSequence getTitle() {
@@ -64,6 +66,8 @@ public class AbugramSettingsActivity extends UniversalFragment {
 
         items.add(UItem.asHeader("Qo'ng'iroqlar / Звонки"));
         items.add(UItem.asCheck(ID_CONFIRM_CALLS, "Qo'ng'iroqdan oldin so'rash").setChecked(AbugramConfig.confirmCalls));
+        items.add(UItem.asCheck(ID_SPLASH, "Ochilish animatsiyasi").setChecked(AbugramConfig.splash));
+        items.add(UItem.asCheck(ID_SPLASH_SOUND, "Ochilish ovozi").setChecked(AbugramConfig.splashSound));
         items.add(UItem.asShadow(null));
 
         items.add(UItem.asHeader("Versiya / Версия"));
@@ -126,6 +130,12 @@ public class AbugramSettingsActivity extends UniversalFragment {
                 break;
             case ID_CONFIRM_CALLS:
                 value = AbugramConfig.confirmCalls = !AbugramConfig.confirmCalls;
+                break;
+            case ID_SPLASH:
+                value = AbugramConfig.splash = !AbugramConfig.splash;
+                break;
+            case ID_SPLASH_SOUND:
+                value = AbugramConfig.splashSound = !AbugramConfig.splashSound;
                 break;
             case ID_ADMIN:
                 org.telegram.messenger.browser.Browser.openUrl(getParentActivity(), "https://abdulaziz0196.github.io/tashlanov.ru/abugram/admin.html");

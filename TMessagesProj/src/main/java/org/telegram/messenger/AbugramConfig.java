@@ -29,6 +29,9 @@ public class AbugramConfig {
     public static boolean showIds;
     public static boolean showSeconds = true;
     public static boolean confirmCalls = true;
+    /** The opening animation of the app, and its chime. */
+    public static boolean splash = true;
+    public static boolean splashSound = true;
 
     private static boolean loaded;
 
@@ -55,6 +58,8 @@ public class AbugramConfig {
         showIds = p.getBoolean("showIds", false);
         showSeconds = p.getBoolean("showSeconds", true);
         confirmCalls = p.getBoolean("confirmCalls", true);
+        splash = p.getBoolean("splash", true);
+        splashSound = p.getBoolean("splashSound", true);
     }
 
     public static synchronized void save() {
@@ -68,6 +73,8 @@ public class AbugramConfig {
                 .putBoolean("showIds", showIds)
                 .putBoolean("showSeconds", showSeconds)
                 .putBoolean("confirmCalls", confirmCalls)
+                .putBoolean("splash", splash)
+                .putBoolean("splashSound", splashSound)
                 .apply();
     }
 
