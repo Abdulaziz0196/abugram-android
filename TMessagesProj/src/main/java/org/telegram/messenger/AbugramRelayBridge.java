@@ -12,6 +12,7 @@ import java.net.Socket;
 import java.net.URL;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
@@ -59,6 +60,10 @@ public class AbugramRelayBridge {
             this.result = result;
         }
     }
+
+    /** Big packets (file parts) go to the relay a few at a time: more only queue behind each other on the phone's uplink and time out. */
+    private static final Semaphore BIG_POSTS = new Semaphore(4);
+    private static final int BIG_PACKET = 64 * 1024;
 
     private static final int KEEP_STATS = 40;
     private static final java.util.ArrayDeque<Stat> STATS = new java.util.ArrayDeque<>();
@@ -297,6 +302,23 @@ public class AbugramRelayBridge {
         }
 
         private void post(byte[] message) {
+            final boolean big = message.length > BIG_PACKET;
+            if (big) {
+                try {
+                    BIG_POSTS.acquire();
+                } catch (InterruptedException e) {
+                    close();
+                    return;
+                }
+            }
+            try {
+                postNow(message);
+            } finally {
+                if (big) BIG_POSTS.release();
+            }
+        }
+
+        private void postNow(byte[] message) {
             HttpURLConnection c = null;
             final long started = System.currentTimeMillis();
             boolean reuse = false; // a fully read answer leaves the HTTPS connection open for the next request: no new handshake
