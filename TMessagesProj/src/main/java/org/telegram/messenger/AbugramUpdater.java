@@ -33,6 +33,9 @@ import java.util.Locale;
 public class AbugramUpdater {
 
     private static final String RELEASE = "https://api.github.com/repos/Abdulaziz0196/abugram-android/releases/latest";
+    /** The download page on the owner's own site: asked first (its file is kept there), GitHub is the fallback. */
+    private static final String MIRROR = "https://tashlanov.uz/xabarchi/?api=latest";
+    private static volatile String fallbackUrl = "";
     private static final String ACTION = "org.telegram.abugram.INSTALL_RESULT";
     private static boolean shown;
     private static volatile boolean busy;
@@ -40,6 +43,11 @@ public class AbugramUpdater {
     /** Looks for a newer build (off the main thread); asks the user when there is one. */
     public static void check(boolean forced) {
         if (shown || busy || (!forced && !AbugramConfig.featureOn("updater"))) return;
+        try {
+            if (checkMirror(forced)) return;
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
         try {
             JSONObject release = new JSONObject(get(RELEASE));
             String tag = release.optString("tag_name", "");
@@ -59,6 +67,27 @@ public class AbugramUpdater {
             }
         } catch (Throwable e) {
             FileLog.e(e);
+        }
+    }
+
+    /** The site's /?api=latest: build, size, sha256 and the download link. Returns true when it has handled the check. */
+    private static boolean checkMirror(boolean forced) {
+        try {
+            JSONObject j = new JSONObject(get(MIRROR));
+            if (!j.optBoolean("ok", false)) return false;
+            int build = j.optInt("build", 0);
+            String url = j.optString("download", "");
+            if (build <= 0 || !url.startsWith("https://")) return false;
+            if (build <= AbugramVersion.build()) return true; // up to date: nothing to ask on GitHub either
+            SharedPreferences p = ApplicationLoader.applicationContext.getSharedPreferences("abugram_update", Activity.MODE_PRIVATE);
+            if (!forced && p.getInt("skipped", 0) == build) return true;
+            shown = true;
+            fallbackUrl = j.optString("github", "");
+            String sha = j.optString("sha256", "");
+            prompt(build, "Xabarchi uz " + j.optString("version", "") + " (" + build + ")", url, j.optLong("size"), sha.isEmpty() ? "" : "sha256:" + sha, forced);
+            return true;
+        } catch (Throwable e) {
+            return false; // the site is not reachable: GitHub answers instead
         }
     }
 
@@ -111,7 +140,15 @@ public class AbugramUpdater {
                 File[] old = dir.listFiles();
                 if (old != null) for (File f : old) f.delete();
                 File apk = new File(dir, "xabarchi-" + build + ".apk");
-                download(url, apk, size, (done, total) -> AndroidUtilities.runOnUIThread(() -> progress.setMessage(megabytes(done) + " / " + megabytes(total))));
+                Progress report = (done, total) -> AndroidUtilities.runOnUIThread(() -> progress.setMessage(megabytes(done) + " / " + megabytes(total)));
+                try {
+                    download(url, apk, size, report);
+                } catch (Throwable first) {
+                    String other = fallbackUrl;
+                    if (other == null || other.isEmpty() || other.equals(url)) throw first;
+                    FileLog.e(first); // the site's copy did not come: the same file from GitHub
+                    download(other, apk, size, report);
+                }
                 if (size > 0 && apk.length() != size) throw new Exception("size " + apk.length() + " != " + size);
                 if (digest.startsWith("sha256:") && !digest.substring(7).equalsIgnoreCase(sha256(apk))) throw new Exception("checksum");
                 AndroidUtilities.runOnUIThread(() -> progress.setMessage("O'rnatilmoqda…"));
