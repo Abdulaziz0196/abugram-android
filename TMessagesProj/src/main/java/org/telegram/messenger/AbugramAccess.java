@@ -167,10 +167,10 @@ public class AbugramAccess {
         });
     }
 
-    /** While the notice is up, looks every 15 seconds whether the account has paid (or the admin switched paid mode off). */
+    /** While the notice is up, looks every 5 seconds whether the account has paid (or the admin switched paid mode off). */
     private static void watchGate(long uid, int round) {
         Utilities.globalQueue.postRunnable(() -> {
-            if (gatePaid || round > 240) return;
+            if (gatePaid || round > 720) return;
             try {
                 fetchAccess(uid);
                 JSONObject c = new JSONObject(request("GET", AbugramProxy.RELAY + "/config", null));
@@ -188,7 +188,7 @@ public class AbugramAccess {
                 FileLog.e(e);
             }
             watchGate(uid, round + 1);
-        }, 15000);
+        }, 5000);
     }
 
     private static String request(String method, String address, String json) throws Exception {
