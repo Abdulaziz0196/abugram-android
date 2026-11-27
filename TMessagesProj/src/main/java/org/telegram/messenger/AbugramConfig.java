@@ -32,6 +32,19 @@ public class AbugramConfig {
     /** The opening animation of the app, and its chime. */
     public static boolean splash = true;
     /** Features the admin switched off from the admin panel (relay /config `off`): ads, splash, updater, sendTime, ghost, keepDeleted. */
+    /** The channel recommended at the top of the chat list, as the admin set it (relay /config). */
+    public static volatile String promoUser = "my_aboutuz";
+    public static volatile String promoTitle = "Xabarchi uz yangiliklari";
+    public static volatile String promoText = "Yangiliklar, yordam va qo'llanma";
+
+    public static void setPromo(String user, String title, String text) {
+        promoUser = user == null ? "" : user;
+        if (title != null && !title.isEmpty()) promoTitle = title;
+        if (text != null && !text.isEmpty()) promoText = text;
+        ApplicationLoader.applicationContext.getSharedPreferences("abugram_config", Activity.MODE_PRIVATE).edit()
+                .putString("promoUser", promoUser).putString("promoTitle", promoTitle).putString("promoText", promoText).apply();
+    }
+
     private static volatile java.util.Set<String> featuresOff = new java.util.HashSet<>();
 
     public static boolean featureOn(String key) {
@@ -72,6 +85,9 @@ public class AbugramConfig {
         confirmCalls = p.getBoolean("confirmCalls", true);
         splash = p.getBoolean("splash", true);
         featuresOff = new java.util.HashSet<>(p.getStringSet("featuresOff", new java.util.HashSet<>()));
+        promoUser = p.getString("promoUser", promoUser);
+        promoTitle = p.getString("promoTitle", promoTitle);
+        promoText = p.getString("promoText", promoText);
         splashSound = p.getBoolean("splashSound", true);
     }
 

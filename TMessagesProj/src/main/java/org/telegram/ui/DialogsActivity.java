@@ -617,6 +617,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private FragmentContextView fragmentContextView;
     private FrameLayout fragmentContextViewWrapper;
     private DialogsActivityTopPanelLayout topPanelLayout;
+    private org.telegram.ui.Components.AbugramHomeCards abugramHomeCards;
     private DialogsActivityTopBubblesFadeView topBubblesFadeView;
     private ActiveGiftAuctionsHintCell activeGiftAuctionsHintCell;
     private DialogsHintCell dialogsHintCell;
@@ -4737,6 +4738,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             topPanelLayout.setPriority(fragmentContextViewWrapper, 4);
             topPanelLayout.setDebugName(fragmentContextViewWrapper, "fragment context");
             topPanelLayout.setViewVisible(fragmentContextViewWrapper, true, false);
+            // Xabarchi: the admin's messages and the recommended channel at the top of the chat list
+            abugramHomeCards = org.telegram.ui.Components.AbugramHomeCards.attach(this, context, currentAccount, topPanelLayout);
 
             fragmentLocationContextView = new FragmentContextView(context, this, true) {
                 @Override
@@ -6943,6 +6946,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     @Override
     public void onResume() {
+        if (abugramHomeCards != null) {
+            abugramHomeCards.update();
+            org.telegram.messenger.Utilities.globalQueue.postRunnable(() -> org.telegram.messenger.AbugramInbox.refresh(org.telegram.messenger.AbugramAccess.currentUid));
+        }
         super.onResume();
         if (dialogStoriesCell != null) {
             dialogStoriesCell.onResume();

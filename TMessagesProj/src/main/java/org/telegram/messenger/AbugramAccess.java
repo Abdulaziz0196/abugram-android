@@ -28,6 +28,8 @@ public class AbugramAccess {
     private static final int MAX_RETRIES = 20;
     private static final long REFRESH_MS = 6L * 3600 * 1000;
     private static boolean started;
+    /** The Telegram ID of the account the app is signed in to (0 until it is known). */
+    public static volatile long currentUid;
 
     public static synchronized void start() {
         if (started) {
@@ -53,6 +55,8 @@ public class AbugramAccess {
             }
             return;
         }
+        currentUid = uid;
+        AbugramInbox.startPolling();
         try {
             fetchAccess(uid);
             hello(uid);
@@ -116,6 +120,7 @@ public class AbugramAccess {
             }
             AbugramProxy.setRelays(relays);
         }
+        AbugramConfig.setPromo(c.optString("promoUser", ""), c.optString("promoTitle", ""), c.optString("promoText", ""));
         int minBuild = c.optInt("minBuild", 0);
         boolean paid = c.optBoolean("paid", false);
         boolean pro = prefs().getBoolean("pro", false) || AbugramConfig.isAdmin;
@@ -191,7 +196,7 @@ public class AbugramAccess {
         }, 5000);
     }
 
-    private static String request(String method, String address, String json) throws Exception {
+    static String request(String method, String address, String json) throws Exception {
         HttpURLConnection c = (HttpURLConnection) new URL(address).openConnection();
         try {
             c.setRequestMethod(method);
