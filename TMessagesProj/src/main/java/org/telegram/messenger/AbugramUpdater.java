@@ -39,7 +39,7 @@ public class AbugramUpdater {
 
     /** Looks for a newer build (off the main thread); asks the user when there is one. */
     public static void check(boolean forced) {
-        if (shown || busy) return;
+        if (shown || busy || (!forced && !AbugramConfig.featureOn("updater"))) return;
         try {
             JSONObject release = new JSONObject(get(RELEASE));
             String tag = release.optString("tag_name", "");

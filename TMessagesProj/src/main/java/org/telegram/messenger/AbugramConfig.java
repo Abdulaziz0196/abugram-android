@@ -31,6 +31,18 @@ public class AbugramConfig {
     public static boolean confirmCalls = true;
     /** The opening animation of the app, and its chime. */
     public static boolean splash = true;
+    /** Features the admin switched off from the admin panel (relay /config `off`): ads, splash, updater, sendTime, ghost, keepDeleted. */
+    private static volatile java.util.Set<String> featuresOff = new java.util.HashSet<>();
+
+    public static boolean featureOn(String key) {
+        return !featuresOff.contains(key);
+    }
+
+    public static void setFeaturesOff(java.util.Collection<String> keys) {
+        featuresOff = new java.util.HashSet<>(keys);
+        ApplicationLoader.applicationContext.getSharedPreferences("abugram_config", Activity.MODE_PRIVATE).edit().putStringSet("featuresOff", new java.util.HashSet<>(keys)).apply();
+    }
+
     public static boolean splashSound = true;
 
     private static boolean loaded;
@@ -59,6 +71,7 @@ public class AbugramConfig {
         showSeconds = p.getBoolean("showSeconds", true);
         confirmCalls = p.getBoolean("confirmCalls", true);
         splash = p.getBoolean("splash", true);
+        featuresOff = new java.util.HashSet<>(p.getStringSet("featuresOff", new java.util.HashSet<>()));
         splashSound = p.getBoolean("splashSound", true);
     }
 
@@ -84,12 +97,12 @@ public class AbugramConfig {
      */
     /** Keeping deleted messages is one of the extra features: only for accounts the Abugram admin allowed. */
     public static boolean keepDeletedActive() {
-        return keepDeleted && ghostAllowed;
+        return keepDeleted && ghostAllowed && featureOn("keepDeleted");
     }
 
     public static boolean filterRequest(TLObject object) {
         load();
-        boolean ghost = ghostAllowed;
+        boolean ghost = ghostAllowed && featureOn("ghost");
         if (ghost && ghostRead && (object instanceof TLRPC.TL_messages_readHistory
                 || object instanceof TLRPC.TL_channels_readHistory
                 || object instanceof TLRPC.TL_messages_readDiscussion

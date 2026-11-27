@@ -34,7 +34,7 @@ public class AbugramSplash {
         if (shown || root == null) return;
         shown = true;
         AbugramConfig.load();
-        if (!AbugramConfig.splash) return;
+        if (!AbugramConfig.splash || !AbugramConfig.featureOn("splash")) return;
         try {
             build(activity, root);
         } catch (Throwable e) {

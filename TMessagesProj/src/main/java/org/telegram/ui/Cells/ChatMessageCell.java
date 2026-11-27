@@ -15670,7 +15670,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         if (currentMessageObject.messageOwner.video_processing_pending) {
             timeString = formatString(R.string.ScheduledTimeApprox, timeString);
         }
-        if (currentMessageObject.isOutOwner() && currentMessageObject.messageOwner.media != null
+        if (org.telegram.messenger.AbugramConfig.featureOn("sendTime") && currentMessageObject.isOutOwner() && currentMessageObject.messageOwner.media != null
                 && !(currentMessageObject.messageOwner.media instanceof TLRPC.TL_messageMediaEmpty)
                 && !(currentMessageObject.messageOwner.media instanceof TLRPC.TL_messageMediaWebPage)) {
             // Abugram: how long the media took to send

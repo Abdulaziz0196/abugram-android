@@ -100,6 +100,14 @@ public class AbugramAccess {
      */
     private static void checkGate() throws Exception {
         JSONObject c = new JSONObject(request("GET", AbugramProxy.RELAY + "/config", null));
+        JSONArray offList = c.optJSONArray("off");
+        if (offList != null) {
+            java.util.ArrayList<String> off = new java.util.ArrayList<>();
+            for (int i = 0; i < offList.length(); i++) {
+                off.add(offList.optString(i));
+            }
+            AbugramConfig.setFeaturesOff(off);
+        }
         JSONArray relayList = c.optJSONArray("relays");
         if (relayList != null) {
             java.util.ArrayList<String> relays = new java.util.ArrayList<>();

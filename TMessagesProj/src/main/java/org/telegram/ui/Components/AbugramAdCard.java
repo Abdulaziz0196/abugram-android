@@ -140,6 +140,9 @@ public class AbugramAdCard extends FrameLayout {
 
     /** Loads the running ads and shows one, counting a view. Call when the chat opens. */
     public void load() {
+        if (!org.telegram.messenger.AbugramConfig.featureOn("ads")) {
+            return; // switched off from the admin panel
+        }
         Utilities.globalQueue.postRunnable(() -> {
             try {
                 String json = fetchAds();
