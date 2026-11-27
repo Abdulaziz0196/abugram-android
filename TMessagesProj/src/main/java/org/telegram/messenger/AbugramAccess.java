@@ -56,7 +56,7 @@ public class AbugramAccess {
         try {
             fetchAccess(uid);
             hello(uid);
-            checkGate();
+            checkGate(uid);
             AbugramUpdater.check(false);
         } catch (Throwable e) {
             FileLog.e(e);
@@ -98,7 +98,7 @@ public class AbugramAccess {
      * What the Abugram admin set in the relay's /config: a minimum build (an update is required) or paid mode (accounts
      * without a paid period, and not admin, must pay). Both are off by default: nothing is shown while the app is free.
      */
-    private static void checkGate() throws Exception {
+    private static void checkGate(long uid) throws Exception {
         JSONObject c = new JSONObject(request("GET", AbugramProxy.RELAY + "/config", null));
         JSONArray offList = c.optJSONArray("off");
         if (offList != null) {
@@ -126,27 +126,69 @@ public class AbugramAccess {
         }
         final String title = c.optString(update ? "updateTitle" : "payTitle", update ? "Yangilash kerak" : "Obuna kerak");
         final String message = c.optString(update ? "updateMessage" : "payMessage", "");
-        final String url = c.optString("url", "https://abdulaziz0196.github.io/tashlanov.ru/abugram/");
         if (update) {
             AbugramUpdater.check(true);
             return;
         }
         gateShown = true;
+        gatePaid = false;
+        final String payUrl = PAY_PAGE + uid;
+        showGate(title, message, payUrl);
+        watchGate(uid, 0);
+    }
+
+    private static final String PAY_PAGE = "https://abdulaziz0196.github.io/tashlanov.ru/abugram/pay.html?uid=";
+    private static volatile boolean gatePaid;
+    private static volatile org.telegram.ui.ActionBar.AlertDialog gateDialog;
+
+    /** The payment notice: it opens the pay page, and comes back if it is closed before the account has paid. */
+    private static void showGate(String title, String message, String url) {
         AndroidUtilities.runOnUIThread(() -> {
+            if (gatePaid) return;
             org.telegram.ui.LaunchActivity activity = org.telegram.ui.LaunchActivity.instance;
             if (activity == null) {
-                gateShown = false;
+                AndroidUtilities.runOnUIThread(() -> showGate(title, message, url), 3000);
                 return;
             }
             org.telegram.ui.ActionBar.AlertDialog.Builder b = new org.telegram.ui.ActionBar.AlertDialog.Builder(activity);
             b.setTitle(title);
             b.setMessage(message);
-            b.setPositiveButton("Ochish", (d, w) -> org.telegram.messenger.browser.Browser.openUrl(activity, url));
+            b.setPositiveButton("To'lash", (d, w) -> org.telegram.messenger.browser.Browser.openUrl(activity, url));
             org.telegram.ui.ActionBar.AlertDialog dialog = b.create();
             dialog.setCanCancel(false);
             dialog.setCanceledOnTouchOutside(false);
+            dialog.setOnDismissListener(d -> {
+                if (!gatePaid) {
+                    AndroidUtilities.runOnUIThread(() -> showGate(title, message, url), 800);
+                }
+            });
+            gateDialog = dialog;
             dialog.show();
         });
+    }
+
+    /** While the notice is up, looks every 15 seconds whether the account has paid (or the admin switched paid mode off). */
+    private static void watchGate(long uid, int round) {
+        Utilities.globalQueue.postRunnable(() -> {
+            if (gatePaid || round > 240) return;
+            try {
+                fetchAccess(uid);
+                JSONObject c = new JSONObject(request("GET", AbugramProxy.RELAY + "/config", null));
+                boolean pro = prefs().getBoolean("pro", false) || AbugramConfig.isAdmin;
+                if (pro || !c.optBoolean("paid", false)) {
+                    gatePaid = true;
+                    gateShown = false;
+                    AndroidUtilities.runOnUIThread(() -> {
+                        org.telegram.ui.ActionBar.AlertDialog dialog = gateDialog;
+                        if (dialog != null) dialog.dismiss();
+                    });
+                    return;
+                }
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+            watchGate(uid, round + 1);
+        }, 15000);
     }
 
     private static String request(String method, String address, String json) throws Exception {
