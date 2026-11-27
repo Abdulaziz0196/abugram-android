@@ -24,7 +24,7 @@ import org.telegram.messenger.FileLog;
 import org.telegram.messenger.R;
 
 /**
- * Xabarchi's opening: the logo pops in, the name and the address rise under it, a short chime plays, then it fades into the app.
+ * Xabarchi's opening: the logo pops in, the name ("Xabarchi uz") and the slogan rise under it, a short chime plays, then it fades into the app.
  * Once per start of the app; a tap skips it. Settings → Xabarchi switches it off.
  */
 public class AbugramSplash {
@@ -64,7 +64,9 @@ public class AbugramSplash {
         column.addView(logo, new LinearLayout.LayoutParams(dp(132), dp(132)));
 
         TextView name = new TextView(context);
-        name.setText("Xabarchi");
+        android.text.SpannableString title = new android.text.SpannableString("Xabarchi uz");
+        title.setSpan(new android.text.style.ForegroundColorSpan(0xFF00D5FF), 9, 11, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        name.setText(title);
         name.setTextColor(0xFFFFFFFF);
         name.setTextSize(32);
         name.setTypeface(Typeface.DEFAULT_BOLD);
@@ -74,8 +76,8 @@ public class AbugramSplash {
         column.addView(name, nameParams);
 
         TextView address = new TextView(context);
-        address.setText("xabarchi.uz");
-        address.setTextColor(0xFF00D5FF);
+        address.setText("Tez. Qulay. VPN'siz.");
+        address.setTextColor(0xFFA3A3B5);
         address.setTextSize(16);
         address.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams addressParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="AppName">Xabarchi</string>
-    <string name="AppNameBeta">Xabarchi Beta</string>
+    <string name="AppName">Xabarchi uz</string>
+    <string name="AppNameBeta">Xabarchi uz Beta</string>
     <string name="LanguageName">한국어</string>
     <string name="English">영어</string>
     <string name="LanguageNameInEnglish">한국어</string>
