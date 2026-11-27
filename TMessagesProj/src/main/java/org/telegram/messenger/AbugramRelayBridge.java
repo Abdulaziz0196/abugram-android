@@ -128,6 +128,41 @@ public class AbugramRelayBridge {
         log("relays: " + list.size());
     }
 
+    /** All relays are given another chance (after a stretch of failures). */
+    public void resetHealth() {
+        for (Relay r : relays) {
+            r.fails = 0;
+        }
+    }
+
+    /** Whether any relay answers at all (any HTTP answer counts; used to come back to the relay after a fallback). */
+    public boolean probe() {
+        for (Relay r : relays) {
+            HttpURLConnection c = null;
+            try {
+                c = (HttpURLConnection) new URL(r.base + "/pluto/apiw1").openConnection();
+                c.setRequestMethod("POST");
+                c.setDoOutput(true);
+                c.setConnectTimeout(6000);
+                c.setReadTimeout(8000);
+                c.setRequestProperty("X-Abugram-Build", String.valueOf(AbugramVersion.build()));
+                c.setFixedLengthStreamingMode(1);
+                try (OutputStream o = c.getOutputStream()) {
+                    o.write(0);
+                }
+                int code = c.getResponseCode();
+                if (code > 0 && code != 426) {
+                    r.fails = 0;
+                    return true;
+                }
+            } catch (Throwable ignore) {
+            } finally {
+                if (c != null) c.disconnect();
+            }
+        }
+        return false;
+    }
+
     /** The best relay now, other than the one to avoid; null when there is no other. */
     private Relay pick(Relay avoid) {
         Relay best = null;

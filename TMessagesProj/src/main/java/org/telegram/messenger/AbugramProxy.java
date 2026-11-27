@@ -82,13 +82,152 @@ public class AbugramProxy {
                 && "127.0.0.1".equals(SharedConfig.currentProxy.settings.getAddress());
     }
 
-    /** The relay servers the admin set (relay /config): saved, and given to the running bridge. */
-    public static void setRelays(java.util.List<String> bases) {
-        ApplicationLoader.applicationContext.getSharedPreferences(PREFS, Activity.MODE_PRIVATE).edit().putString("relays", TextUtils.join("\n", bases)).apply();
+    // ---- the relay servers: from the admin's /config, from a directory file kept on GitHub (and its mirrors), and the built-in one
+    private static final String[] RELAY_DIRECTORY = {
+            "https://raw.githubusercontent.com/Abdulaziz0196/tashlanov.ru/main/abugram/relays.json",
+            "https://cdn.jsdelivr.net/gh/Abdulaziz0196/tashlanov.ru@main/abugram/relays.json",
+            "https://fastly.jsdelivr.net/gh/Abdulaziz0196/tashlanov.ru@main/abugram/relays.json",
+            "https://abdulaziz0196.github.io/tashlanov.ru/abugram/relays.json"
+    };
+    private static volatile java.util.List<String> configRelays = new ArrayList<>();
+    private static volatile java.util.List<String> directoryRelays = new ArrayList<>();
+
+    private static void mergeRelays() {
+        java.util.LinkedHashSet<String> all = new java.util.LinkedHashSet<>();
+        all.addAll(configRelays);
+        all.addAll(directoryRelays);
+        ApplicationLoader.applicationContext.getSharedPreferences(PREFS, Activity.MODE_PRIVATE).edit()
+                .putString("relays", TextUtils.join("\n", configRelays)).putString("relaysDir", TextUtils.join("\n", directoryRelays)).apply();
         AbugramRelayBridge b = bridge;
         if (b != null) {
-            b.setRelays(bases);
+            b.setRelays(new ArrayList<>(all));
         }
+    }
+
+    /** The relay servers the admin set (relay /config). */
+    public static void setRelays(java.util.List<String> bases) {
+        configRelays = new ArrayList<>(bases);
+        mergeRelays();
+    }
+
+    /**
+     * Reads the relay directory file from GitHub or a mirror: if the relay's own address is ever blocked, a new address put
+     * in that file reaches every app without an update.
+     */
+    public static void refreshDirectory() {
+        for (String url : RELAY_DIRECTORY) {
+            String text = download(url);
+            if (text == null) continue;
+            try {
+                org.json.JSONArray list = new org.json.JSONObject(text).optJSONArray("relays");
+                if (list == null) continue;
+                ArrayList<String> found = new ArrayList<>();
+                for (int i = 0; i < list.length() && i < 10; i++) {
+                    found.add(list.optString(i));
+                }
+                directoryRelays = found;
+                mergeRelays();
+                return;
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+        }
+    }
+
+    // ---- self-healing: when the connection stays down, the app steps through other ways by itself and returns to the relay
+    private static SharedConfig.ProxyInfo bridgeProxyInfo;
+    private static final ArrayList<SharedConfig.ProxyInfo> fallbackProxies = new ArrayList<>();
+    private static String mode = "bridge"; // bridge | direct | mtproxy
+    private static long badSince;
+    private static int stage;
+    private static long lastProbe;
+    private static long lastDirectoryRefresh;
+
+    private static void tick() {
+        try {
+            int state = ConnectionsManager.getInstance(UserConfig.selectedAccount).getConnectionState();
+            boolean ok = state == ConnectionsManager.ConnectionStateConnected || state == ConnectionsManager.ConnectionStateUpdating;
+            long now = SystemClock.elapsedRealtime();
+            SharedConfig.ProxyInfo bridgeInfo = bridgeProxyInfo;
+            boolean ours = bridgeInfo != null && (SharedConfig.currentProxy == bridgeInfo || !mode.equals("bridge"));
+            if (now - lastDirectoryRefresh > 6L * 3600 * 1000) {
+                lastDirectoryRefresh = now;
+                refreshDirectory();
+            }
+            if (!ours) {
+                // the user chose their own proxy, or turned proxies off: nothing here changes it
+                badSince = 0;
+                stage = 0;
+            } else if (ok) {
+                badSince = 0;
+                stage = 0;
+                if (!mode.equals("bridge") && now - lastProbe > 5 * 60 * 1000) {
+                    lastProbe = now;
+                    AbugramRelayBridge b = bridge;
+                    if (b != null && b.probe()) {
+                        AndroidUtilities.runOnUIThread(() -> goBridge());
+                    }
+                }
+            } else if (state != ConnectionsManager.ConnectionStateWaitingForNetwork) {
+                if (badSince == 0) badSince = now;
+                long bad = now - badSince;
+                if (bad > 45000 && stage < 1) {
+                    stage = 1; // fresh relay addresses, and all relays tried again
+                    refreshDirectory();
+                    AbugramRelayBridge b = bridge;
+                    if (b != null) b.resetHealth();
+                } else if (bad > 100000 && stage < 2) {
+                    stage = 2;
+                    AndroidUtilities.runOnUIThread(() -> goDirect());
+                } else if (bad > 160000 && stage < 3) {
+                    stage = 3;
+                    AndroidUtilities.runOnUIThread(() -> goFallbackProxy());
+                } else if (bad > 260000) {
+                    badSince = now; // round again: the relay first
+                    stage = 0;
+                    AndroidUtilities.runOnUIThread(() -> goBridge());
+                }
+            }
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+        Utilities.globalQueue.postRunnable(AbugramProxy::tick, 15000);
+    }
+
+    private static void setAutoFallback(boolean value) {
+        ApplicationLoader.applicationContext.getSharedPreferences(PREFS, Activity.MODE_PRIVATE).edit().putBoolean("autoFallback", value).apply();
+    }
+
+    private static void goBridge() {
+        SharedConfig.ProxyInfo info = bridgeProxyInfo;
+        if (info == null) return;
+        mode = "bridge";
+        setAutoFallback(false);
+        select(info);
+    }
+
+    private static void goDirect() {
+        mode = "direct";
+        setAutoFallback(true);
+        MessagesController.getGlobalMainSettings().edit().putBoolean("proxy_enabled", false).commit();
+        ConnectionsManager.setProxySettings(false, null);
+        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.proxySettingsChanged);
+    }
+
+    private static void goFallbackProxy() {
+        if (fallbackProxies.isEmpty()) {
+            return;
+        }
+        mode = "mtproxy";
+        setAutoFallback(true);
+        SharedConfig.ProxyInfo pick = null;
+        for (SharedConfig.ProxyInfo info : fallbackProxies) {
+            if (info.available) {
+                pick = info;
+                break;
+            }
+        }
+        select(pick != null ? pick : fallbackProxies.get((int) (System.currentTimeMillis() / 1000 % fallbackProxies.size())));
     }
 
     public static void start() {
@@ -101,10 +240,13 @@ public class AbugramProxy {
                 bridge = new AbugramRelayBridge(RELAY, FileLog::d);
                 bridgePort = bridge.start(BRIDGE_PORT);
                 // the relay servers known from the last start, so a faster one is used from the first request
-                String saved = ApplicationLoader.applicationContext.getSharedPreferences(PREFS, Activity.MODE_PRIVATE).getString("relays", "");
-                if (!saved.isEmpty()) {
-                    bridge.setRelays(java.util.Arrays.asList(saved.split("\n")));
-                }
+                SharedPreferences saved = ApplicationLoader.applicationContext.getSharedPreferences(PREFS, Activity.MODE_PRIVATE);
+                String savedConfig = saved.getString("relays", "");
+                String savedDirectory = saved.getString("relaysDir", "");
+                if (!savedConfig.isEmpty()) configRelays = new ArrayList<>(java.util.Arrays.asList(savedConfig.split("\n")));
+                if (!savedDirectory.isEmpty()) directoryRelays = new ArrayList<>(java.util.Arrays.asList(savedDirectory.split("\n")));
+                mergeRelays();
+                Utilities.globalQueue.postRunnable(AbugramProxy::tick, 20000);
             } catch (Throwable e) {
                 FileLog.e(e);
                 bridge = null;
@@ -216,18 +358,23 @@ public class AbugramProxy {
                     .build();
             newKeys.add(key(bridgeSettings));
             bridgeInfo = SharedConfig.addProxy(new SharedConfig.ProxyInfo(bridgeSettings));
+            bridgeProxyInfo = bridgeInfo;
         }
         ArrayList<SharedConfig.ProxyInfo> managed = new ArrayList<>();
         for (ProxySettings settings : servers) {
             managed.add(SharedConfig.addProxy(new SharedConfig.ProxyInfo(settings)));
         }
         prefs.edit().putStringSet(KEY_MANAGED, newKeys).apply();
+        fallbackProxies.clear();
+        fallbackProxies.addAll(managed);
 
         SharedPreferences main = MessagesController.getGlobalMainSettings();
         boolean enabled = main.getBoolean("proxy_enabled", false);
         SharedConfig.ProxyInfo current = SharedConfig.currentProxy;
         boolean currentIsUsers = current != null && !newKeys.contains(key(current.settings)) && !previouslyManaged.contains(key(current.settings));
-        if ((initialized && !enabled) || (enabled && currentIsUsers)) {
+        // proxies off by the user stay off; proxies off because the app itself fell back to a direct connection do not
+        boolean userTurnedOff = initialized && !enabled && !prefs.getBoolean("autoFallback", false);
+        if (userTurnedOff || (enabled && currentIsUsers)) {
             NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.proxySettingsChanged);
             return;
         }
