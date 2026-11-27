@@ -10174,7 +10174,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         checkUi_itemDownloadsVisibility();
 
         final SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
-        boolean proxyEnabled = preferences.getBoolean("proxy_enabled", false);
+        // Xabarchi: its own relay is not shown as a proxy (no shield in the toolbar)
+        boolean proxyEnabled = preferences.getBoolean("proxy_enabled", false) && !org.telegram.messenger.AbugramProxy.viaRelay();
         final boolean connected = currentConnectionState == ConnectionsManager.ConnectionStateConnected || currentConnectionState == ConnectionsManager.ConnectionStateUpdating;
         proxyMenuSubItem.setSubtext(getString(proxyEnabled ? (connected ? R.string.MenuProxyConnected : R.string.MenuProxyConnecting) : R.string.MenuProxyDisabled));
         proxyDrawable.setConnected(proxyEnabled, connected, animated);

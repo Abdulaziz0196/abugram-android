@@ -86,7 +86,64 @@ public class AbugramRelayBridge {
         }
     }
 
+    /** One relay server: the app can use several and moves to another when one stops answering. */
+    private static final class Relay {
+        final String base;
+        volatile int fails;
+        volatile long failedAt;
+        volatile double ewma; // milliseconds of a small request, smoothed
+        Relay(String base, double ewma) {
+            this.base = base;
+            this.ewma = ewma;
+        }
+    }
+
     private final String relayBase;
+    private volatile Relay[] relays;
+
+    /**
+     * The relay servers to use, the first ones preferred: those from the admin's list, then the built-in one as the last
+     * resort. A server that is already known keeps what the app has learned about it.
+     */
+    public synchronized void setRelays(java.util.List<String> bases) {
+        java.util.ArrayList<Relay> list = new java.util.ArrayList<>();
+        Relay[] old = relays;
+        for (String b : bases) {
+            String base = b == null ? "" : b.trim().replaceAll("/+$", "");
+            if (!base.startsWith("https://") || base.length() < 12) continue;
+            Relay existing = null;
+            for (Relay r : old) if (r.base.equals(base)) existing = r;
+            boolean dup = false;
+            for (Relay r : list) if (r.base.equals(base)) dup = true;
+            if (!dup) list.add(existing != null ? existing : new Relay(base, 200));
+        }
+        boolean hasBuiltIn = false;
+        for (Relay r : list) if (r.base.equals(relayBase)) hasBuiltIn = true;
+        if (!hasBuiltIn) {
+            Relay builtIn = null;
+            for (Relay r : old) if (r.base.equals(relayBase)) builtIn = r;
+            list.add(builtIn != null ? builtIn : new Relay(relayBase, 300));
+        }
+        relays = list.toArray(new Relay[0]);
+        log("relays: " + list.size());
+    }
+
+    /** The best relay now, other than the one to avoid; null when there is no other. */
+    private Relay pick(Relay avoid) {
+        Relay best = null;
+        double bestScore = Double.MAX_VALUE;
+        long now = System.currentTimeMillis();
+        for (Relay r : relays) {
+            if (r == avoid) continue;
+            double score = r.ewma + (r.fails > 0 && now - r.failedAt < 60000 ? 4000.0 * r.fails : 0);
+            if (score < bestScore) {
+                bestScore = score;
+                best = r;
+            }
+        }
+        return best;
+    }
+
     private final Log log;
     private ServerSocket server;
     private final ExecutorService pool = Executors.newCachedThreadPool(r -> {
@@ -98,6 +155,7 @@ public class AbugramRelayBridge {
     /** @param relayBase e.g. "https://winter-cake-2d11.tashlanow.workers.dev" */
     public AbugramRelayBridge(String relayBase, Log log) {
         this.relayBase = relayBase.replaceAll("/+$", "");
+        this.relays = new Relay[]{new Relay(this.relayBase, 300)};
         this.log = log;
     }
 
@@ -254,7 +312,7 @@ public class AbugramRelayBridge {
                 throw new IOException("unknown datacenter for " + address);
             }
             dcOfSession = dc;
-            url = relayBase + "/" + HOSTS[dc - 1] + "/apiw1";
+            url = "/" + HOSTS[dc - 1] + "/apiw1"; // the relay's address is put in front of it for every request
             log("connection to DC" + dc + " via " + address);
 
             while (!closed) {
@@ -318,17 +376,41 @@ public class AbugramRelayBridge {
             }
         }
 
+        private static final int DONE = 0;
+        private static final int RETRY = 1;
+        private static final int GIVE_UP = 2;
+
+        /** A request goes to the best relay; if that one fails it is sent once more through another. */
         private void postNow(byte[] message) {
+            Relay first = pick(null);
+            if (first == null) {
+                close();
+                return;
+            }
+            int outcome = attempt(message, first);
+            if (outcome == RETRY && !closed) {
+                Relay second = pick(first);
+                if (second != null) {
+                    outcome = attempt(message, second);
+                }
+            }
+            if (outcome != DONE) {
+                close();
+            }
+        }
+
+        private int attempt(byte[] message, Relay relay) {
             HttpURLConnection c = null;
             final long started = System.currentTimeMillis();
             boolean reuse = false; // a fully read answer leaves the HTTPS connection open for the next request: no new handshake
             int received = 0;
+            int outcome = RETRY;
             String result = "xato";
             try {
-                c = (HttpURLConnection) new URL(url).openConnection();
+                c = (HttpURLConnection) new URL(relay.base + url).openConnection();
                 c.setRequestMethod("POST");
                 c.setDoOutput(true);
-                c.setConnectTimeout(15000);
+                c.setConnectTimeout(12000);
                 c.setReadTimeout(45000);
                 c.setRequestProperty("Content-Type", "application/octet-stream");
                 c.setRequestProperty("X-Abugram-Build", String.valueOf(AbugramVersion.build())); // lets the relay ask old builds to update
@@ -344,24 +426,38 @@ public class AbugramRelayBridge {
                     result = "ok";
                     reuse = true;
                     if (body.length > 0) send(body);
+                    outcome = DONE;
                 } else if (status == 404) {
                     // Telegram answers an unknown auth key with HTTP 404, and TCP clients expect the code -404
                     byte[] code = new byte[4];
                     int v = -404;
                     code[0] = (byte) v; code[1] = (byte) (v >> 8); code[2] = (byte) (v >> 16); code[3] = (byte) (v >> 24);
                     send(code);
+                    outcome = DONE;
+                } else if (status == 426) {
+                    log("relay asks for an update");
+                    outcome = GIVE_UP; // the same answer from every relay
                 } else {
-                    log("relay answered " + status);
-                    close();
+                    log("relay " + relay.base + " answered " + status);
+                    outcome = RETRY; // a relay that errors, is overloaded or blocked: another may answer
                 }
             } catch (Throwable e) {
                 log("request failed: " + e);
                 result = e instanceof java.net.SocketTimeoutException ? "vaqt tugadi" : "tarmoq xatosi";
-                close();
+                outcome = RETRY;
             } finally {
                 if (c != null && !reuse) c.disconnect();
-                record(new Stat(dcOfSession, message.length, received, System.currentTimeMillis() - started, result));
+                long took = System.currentTimeMillis() - started;
+                if (outcome == DONE) {
+                    relay.fails = 0;
+                    if (message.length < 16384) relay.ewma = relay.ewma * 0.8 + took * 0.2;
+                } else if (outcome == RETRY) {
+                    relay.fails = Math.min(relay.fails + 1, 5);
+                    relay.failedAt = System.currentTimeMillis();
+                }
+                record(new Stat(dcOfSession, message.length, received, took, result));
             }
+            return outcome;
         }
 
         private synchronized void send(byte[] payload) throws IOException {

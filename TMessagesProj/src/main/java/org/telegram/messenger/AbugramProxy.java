@@ -82,6 +82,15 @@ public class AbugramProxy {
                 && "127.0.0.1".equals(SharedConfig.currentProxy.settings.getAddress());
     }
 
+    /** The relay servers the admin set (relay /config): saved, and given to the running bridge. */
+    public static void setRelays(java.util.List<String> bases) {
+        ApplicationLoader.applicationContext.getSharedPreferences(PREFS, Activity.MODE_PRIVATE).edit().putString("relays", TextUtils.join("\n", bases)).apply();
+        AbugramRelayBridge b = bridge;
+        if (b != null) {
+            b.setRelays(bases);
+        }
+    }
+
     public static void start() {
         if (started) {
             return;
@@ -91,6 +100,11 @@ public class AbugramProxy {
             try {
                 bridge = new AbugramRelayBridge(RELAY, FileLog::d);
                 bridgePort = bridge.start(BRIDGE_PORT);
+                // the relay servers known from the last start, so a faster one is used from the first request
+                String saved = ApplicationLoader.applicationContext.getSharedPreferences(PREFS, Activity.MODE_PRIVATE).getString("relays", "");
+                if (!saved.isEmpty()) {
+                    bridge.setRelays(java.util.Arrays.asList(saved.split("\n")));
+                }
             } catch (Throwable e) {
                 FileLog.e(e);
                 bridge = null;

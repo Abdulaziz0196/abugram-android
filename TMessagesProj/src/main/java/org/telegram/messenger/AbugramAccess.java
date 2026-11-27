@@ -3,6 +3,7 @@ package org.telegram.messenger;
 import android.app.Activity;
 import android.content.SharedPreferences;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
@@ -99,6 +100,14 @@ public class AbugramAccess {
      */
     private static void checkGate() throws Exception {
         JSONObject c = new JSONObject(request("GET", AbugramProxy.RELAY + "/config", null));
+        JSONArray relayList = c.optJSONArray("relays");
+        if (relayList != null) {
+            java.util.ArrayList<String> relays = new java.util.ArrayList<>();
+            for (int i = 0; i < relayList.length() && i < 10; i++) {
+                relays.add(relayList.optString(i));
+            }
+            AbugramProxy.setRelays(relays);
+        }
         int minBuild = c.optInt("minBuild", 0);
         boolean paid = c.optBoolean("paid", false);
         boolean pro = prefs().getBoolean("pro", false) || AbugramConfig.isAdmin;

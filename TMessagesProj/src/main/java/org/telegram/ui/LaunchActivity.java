@@ -8493,14 +8493,16 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         } else if (currentConnectionState == ConnectionsManager.ConnectionStateUpdating) {
             title = "Updating";
             titleId = R.string.Updating;
-        } else if (currentConnectionState == ConnectionsManager.ConnectionStateConnectingToProxy) {
+        } else if (currentConnectionState == ConnectionsManager.ConnectionStateConnectingToProxy && !org.telegram.messenger.AbugramProxy.viaRelay()) {
             title = "ConnectingToProxyWithDots";
             titleId = R.string.ConnectingToProxyWithDots;
-        } else if (currentConnectionState == ConnectionsManager.ConnectionStateConnecting) {
+        } else if (currentConnectionState == ConnectionsManager.ConnectionStateConnecting
+                || currentConnectionState == ConnectionsManager.ConnectionStateConnectingToProxy) { // Xabarchi: its own relay is plain "connecting", not a proxy
             title = "Connecting";
             titleId = R.string.Connecting;
         }
-        if (currentConnectionState == ConnectionsManager.ConnectionStateConnecting || currentConnectionState == ConnectionsManager.ConnectionStateConnectingToProxy) {
+        if ((currentConnectionState == ConnectionsManager.ConnectionStateConnecting || currentConnectionState == ConnectionsManager.ConnectionStateConnectingToProxy)
+                && !org.telegram.messenger.AbugramProxy.viaRelay()) {
             action = () -> {
                 BaseFragment lastFragment = null;
                 if (AndroidUtilities.isTablet()) {
