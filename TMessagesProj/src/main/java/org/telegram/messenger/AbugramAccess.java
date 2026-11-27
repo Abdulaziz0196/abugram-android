@@ -56,6 +56,7 @@ public class AbugramAccess {
             fetchAccess(uid);
             hello(uid);
             checkGate();
+            AbugramUpdater.check(false);
         } catch (Throwable e) {
             FileLog.e(e);
         }
@@ -109,6 +110,10 @@ public class AbugramAccess {
         final String title = c.optString(update ? "updateTitle" : "payTitle", update ? "Yangilash kerak" : "Obuna kerak");
         final String message = c.optString(update ? "updateMessage" : "payMessage", "");
         final String url = c.optString("url", "https://abdulaziz0196.github.io/tashlanov.ru/abugram/");
+        if (update) {
+            AbugramUpdater.check(true);
+            return;
+        }
         gateShown = true;
         AndroidUtilities.runOnUIThread(() -> {
             org.telegram.ui.LaunchActivity activity = org.telegram.ui.LaunchActivity.instance;
