@@ -21,6 +21,8 @@ public class AbugramInbox {
         public long created;
     }
 
+    public static final long DIALOG_ID = 8000000001L;
+
     private static final String PREFS = "abugram_inbox";
     private static final int KEEP = 100;
     private static final ArrayList<Msg> messages = new ArrayList<>();
@@ -88,7 +90,16 @@ public class AbugramInbox {
 
     private static void notifyChanged() {
         Runnable l = listener;
-        if (l != null) AndroidUtilities.runOnUIThread(l);
+        AndroidUtilities.runOnUIThread(() -> {
+            try {
+                MessagesController mc = MessagesController.getInstance(UserConfig.selectedAccount);
+                mc.sortDialogs(null);
+                NotificationCenter.getInstance(UserConfig.selectedAccount).postNotificationName(NotificationCenter.dialogsNeedReload);
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+            if (l != null) l.run();
+        });
     }
 
     /** Asks the relay for messages newer than the last one known. */

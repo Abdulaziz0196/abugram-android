@@ -38,7 +38,14 @@ public class AbugramConfig {
     public static volatile String promoText = "Yangiliklar, yordam va qo'llanma";
 
     public static void setPromo(String user, String title, String text) {
+        String before = promoUser;
         promoUser = user == null ? "" : user;
+        if (!promoUser.equals(before)) {
+            try {
+                MessagesController.getInstance(UserConfig.selectedAccount).checkPromoInfo(true);
+            } catch (Throwable ignore) {
+            }
+        }
         if (title != null && !title.isEmpty()) promoTitle = title;
         if (text != null && !text.isEmpty()) promoText = text;
         ApplicationLoader.applicationContext.getSharedPreferences("abugram_config", Activity.MODE_PRIVATE).edit()

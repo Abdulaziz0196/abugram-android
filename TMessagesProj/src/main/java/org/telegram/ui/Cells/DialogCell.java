@@ -2226,6 +2226,8 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 promoDialog = true;
                 if (messagesController.promoDialogType == MessagesController.PROMO_TYPE_PROXY) {
                     timeString = getString(R.string.UseProxySponsor);
+ } else if (messagesController.promoDialogType == MessagesController.PROMO_TYPE_ABU) {
+                    timeString = "Tavsiya";
                 } else if (messagesController.promoDialogType == MessagesController.PROMO_TYPE_PSA) {
                     timeString = getString("PsaType_" + messagesController.promoPsaType);
                     if (TextUtils.isEmpty(timeString)) {
