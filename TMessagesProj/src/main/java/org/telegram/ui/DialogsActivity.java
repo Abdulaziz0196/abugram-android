@@ -6943,6 +6943,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     @Override
     public void onResume() {
+        org.telegram.messenger.Utilities.globalQueue.postRunnable(() -> org.telegram.messenger.AbugramInbox.refresh(org.telegram.messenger.AbugramAccess.currentUid));
         super.onResume();
         if (dialogStoriesCell != null) {
             dialogStoriesCell.onResume();
@@ -7793,6 +7794,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (getParentActivity() == null) {
             return;
         }
+        if (view instanceof DialogCell && ((DialogCell) view).getDialogId() == org.telegram.messenger.AbugramInbox.DIALOG_ID) {
+            presentFragment(new AbugramInboxActivity());
+            return;
+        }
         long dialogId = 0;
         long topicId = 0;
         int message_id = 0;
@@ -8215,6 +8220,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private boolean onItemLongClick(RecyclerListView listView, View view, int position, float x, float y, int dialogsType, RecyclerListView.Adapter adapter) {
         if (getParentActivity() == null || view instanceof DialogsHintCell) {
             return false;
+        }
+        if (view instanceof DialogCell && ((DialogCell) view).getDialogId() == org.telegram.messenger.AbugramInbox.DIALOG_ID) {
+            return true;
         }
         if (adapter.getItemViewType(position) == DialogsAdapter.VIEW_TYPE_FORWARD_TO_STORIES_CELL) {
             return false;
@@ -10174,7 +10182,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         checkUi_itemDownloadsVisibility();
 
         final SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
-        boolean proxyEnabled = preferences.getBoolean("proxy_enabled", false);
+        // Xabarchi: its own relay is not shown as a proxy (no shield in the toolbar)
+        boolean proxyEnabled = preferences.getBoolean("proxy_enabled", false) && !org.telegram.messenger.AbugramProxy.viaRelay();
         final boolean connected = currentConnectionState == ConnectionsManager.ConnectionStateConnected || currentConnectionState == ConnectionsManager.ConnectionStateUpdating;
         proxyMenuSubItem.setSubtext(getString(proxyEnabled ? (connected ? R.string.MenuProxyConnected : R.string.MenuProxyConnecting) : R.string.MenuProxyDisabled));
         proxyDrawable.setConnected(proxyEnabled, connected, animated);
@@ -12432,7 +12441,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         } else if (isArchive()) {
             newVisibility = !getStoriesController().getHiddenList().isEmpty();
         } else {
-            newVisibility = !onlySelfStories && getStoriesController().hasStories();
+            newVisibility = !org.telegram.messenger.AbugramConfig.hideStories && !onlySelfStories && getStoriesController().hasStories();
             onlySelfStories = getStoriesController().hasOnlySelfStories();
         }
 

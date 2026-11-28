@@ -470,6 +470,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         frameLayout.setClipToPadding(false);
         frameLayout.setClipChildren(false);
         setContentView(frameLayout);
+        org.telegram.ui.Components.AbugramSplash.show(this, frameLayout); // Xabarchi: the opening animation and chime
         rootAnimatedInsetsListener = new WindowAnimatedInsetsProvider(frameLayout);
         PipCoordinator.getInstance().onActivityCreate(this, createActivityVisibilityController(false));
 
@@ -6118,6 +6119,13 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
 
     private boolean firstAppUpdateCheck = true;
     public void checkAppUpdate(boolean force, Browser.Progress progress) {
+        // Abugram: updates come from the Abugram site, never Telegram's own APK (a different app).
+        if (progress != null) {
+            progress.end();
+        }
+        if (true) {
+            return;
+        }
         if (!ApplicationLoader.isStandaloneBuild() && !ApplicationLoader.isBetaBuild()) {
             return;
         }
@@ -8485,14 +8493,16 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         } else if (currentConnectionState == ConnectionsManager.ConnectionStateUpdating) {
             title = "Updating";
             titleId = R.string.Updating;
-        } else if (currentConnectionState == ConnectionsManager.ConnectionStateConnectingToProxy) {
+        } else if (currentConnectionState == ConnectionsManager.ConnectionStateConnectingToProxy && !org.telegram.messenger.AbugramProxy.viaRelay()) {
             title = "ConnectingToProxyWithDots";
             titleId = R.string.ConnectingToProxyWithDots;
-        } else if (currentConnectionState == ConnectionsManager.ConnectionStateConnecting) {
+        } else if (currentConnectionState == ConnectionsManager.ConnectionStateConnecting
+                || currentConnectionState == ConnectionsManager.ConnectionStateConnectingToProxy) { // Xabarchi: its own relay is plain "connecting", not a proxy
             title = "Connecting";
             titleId = R.string.Connecting;
         }
-        if (currentConnectionState == ConnectionsManager.ConnectionStateConnecting || currentConnectionState == ConnectionsManager.ConnectionStateConnectingToProxy) {
+        if ((currentConnectionState == ConnectionsManager.ConnectionStateConnecting || currentConnectionState == ConnectionsManager.ConnectionStateConnectingToProxy)
+                && !org.telegram.messenger.AbugramProxy.viaRelay()) {
             action = () -> {
                 BaseFragment lastFragment = null;
                 if (AndroidUtilities.isTablet()) {

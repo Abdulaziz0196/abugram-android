@@ -1,0 +1,81 @@
+name: Xabarchi APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - claude/telegram-app-creation-40awgy
+    paths-ignore:
+      - '**.md'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: abugram-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android SDK packages
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018" "cmake;3.22.1" > /dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> $GITHUB_ENV
+
+      - name: Restore Gradle cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: abugram-gradle-${{ hashFiles('**/*.gradle', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: abugram-gradle-
+
+      - name: Build APK
+        run: |
+          echo "${{ github.run_number }}" > TMessagesProj/src/main/assets/abugram_build.txt
+          chmod +x gradlew
+          ./gradlew --no-daemon --stacktrace -Dorg.gradle.jvmargs="-Xmx6g -XX:MaxMetaspaceSize=1g" \
+            :TMessagesProj_AppStandalone:assembleAfatStandalone
+          APK=$(find TMessagesProj_AppStandalone/build/outputs/apk -name "*.apk" | head -1)
+          if [ -z "$APK" ]; then echo "::error::No APK produced"; exit 1; fi
+          mkdir -p out && cp "$APK" out/Xabarchi.apk && ls -lh out
+          echo "APP_VERSION=$(grep APP_VERSION_NAME gradle.properties | cut -d= -f2)" >> $GITHUB_ENV
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Xabarchi-android-${{ github.run_number }}
+          path: out/Xabarchi.apk
+          if-no-files-found: error
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: abugram-android-${{ github.run_number }}
+          name: Xabarchi for Android ${{ env.APP_VERSION }} (${{ github.run_number }})
+          body: |
+            Xabarchi for Android ${{ env.APP_VERSION }}. Install Xabarchi.apk directly; it works next to the official Telegram app.
+            Built-in proxies with automatic rotation, so it connects without a VPN where Telegram is blocked.
+          files: out/Xabarchi.apk

@@ -1245,6 +1245,7 @@ public class MessagesController extends BaseController implements NotificationCe
     public static int PROMO_TYPE_PROXY = 0;
     public static int PROMO_TYPE_PSA = 1;
     public static int PROMO_TYPE_OTHER = 2;
+    public static int PROMO_TYPE_ABU = 3;
 
     private static class ReadTask {
         public long dialogId;
@@ -10912,7 +10913,7 @@ public class MessagesController extends BaseController implements NotificationCe
         checkingPromoInfo = true;
         int checkPromoId = lastCheckPromoId;
         TLRPC.TL_help_getPromoData req = new TLRPC.TL_help_getPromoData();
-        checkingPromoInfoRequestId = getConnectionsManager().sendRequest(req, (response, error) -> {
+        RequestDelegate promoDelegate = (response, error) -> {
             if (checkPromoId != lastCheckPromoId) {
                 return;
             }
@@ -10953,7 +10954,10 @@ public class MessagesController extends BaseController implements NotificationCe
                     }
                 }
                 promoDialogId = did;
-                if (res.proxy) {
+                if ("abugram".equals(res.psa_type)) {
+                    promoDialogType = PROMO_TYPE_ABU;
+                    promoPsaType = null;
+                } else if (res.proxy) {
                     promoDialogType = PROMO_TYPE_PROXY;
                 } else if (!TextUtils.isEmpty(res.psa_type)) {
                     promoDialogType = PROMO_TYPE_PSA;
@@ -11166,7 +11170,35 @@ public class MessagesController extends BaseController implements NotificationCe
                 checkingPromoInfo = false;
                 AndroidUtilities.runOnUIThread(this::removePromoDialog);
             }
-        });
+        };
+        String abuUser = AbugramConfig.featureOn("promo") ? AbugramConfig.promoUser : "";
+        if (abuUser != null && !abuUser.isEmpty()) {
+            TLRPC.TL_contacts_resolveUsername resolveReq = new TLRPC.TL_contacts_resolveUsername();
+            resolveReq.username = abuUser;
+            checkingPromoInfoRequestId = getConnectionsManager().sendRequest(resolveReq, (resp, err) -> {
+                if (checkPromoId != lastCheckPromoId) {
+                    return;
+                }
+                if (resp instanceof TLRPC.TL_contacts_resolvedPeer) {
+                    TLRPC.TL_contacts_resolvedPeer rp = (TLRPC.TL_contacts_resolvedPeer) resp;
+                    TLRPC.TL_help_promoData pd = new TLRPC.TL_help_promoData();
+                    pd.psa_type = "abugram";
+                    pd.expires = getConnectionsManager().getCurrentTime() + 10 * 60;
+                    pd.peer = rp.peer;
+                    pd.chats = rp.chats;
+                    pd.users = rp.users;
+                    if (pendingSuggestions != null) pd.pending_suggestions.addAll(pendingSuggestions);
+                    if (dismissedSuggestions != null) pd.dismissed_suggestions.addAll(dismissedSuggestions);
+                    promoDelegate.run(pd, null);
+                } else {
+                    // network trouble: try again soon, keep what is shown
+                    checkingPromoInfo = false;
+                    nextPromoInfoCheckTime = getConnectionsManager().getCurrentTime() + 60;
+                }
+            });
+        } else {
+            checkingPromoInfoRequestId = getConnectionsManager().sendRequest(req, promoDelegate);
+        }
         if (removeCurrent != 0) {
             promoDialogId = 0;
             proxyDialogAddress = null;
@@ -11191,6 +11223,70 @@ public class MessagesController extends BaseController implements NotificationCe
         promoDialog = null;
         sortDialogs(null);
         getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload);
+    }
+
+    /** Local "Xabarchi uz" service chat: admin messages shown as a normal chat-list row (opened by DialogsActivity itself). */
+    public void abugramSyncInboxDialog() {
+        try {
+            java.util.List<AbugramInbox.Msg> list = AbugramConfig.featureOn("inbox") ? AbugramInbox.list() : new ArrayList<>();
+            long uid = AbugramInbox.DIALOG_ID;
+            if (list.isEmpty()) {
+                if (dialogs_dict.get(uid) != null) {
+                    TLRPC.Dialog old = dialogs_dict.get(uid);
+                    dialogs_dict.remove(uid);
+                    allDialogs.remove(old);
+                    dialogMessage.remove(uid);
+                }
+                return;
+            }
+            AbugramInbox.Msg last = list.get(list.size() - 1);
+            TLRPC.User u = getUser(uid);
+            if (u == null) {
+                u = new TLRPC.TL_user();
+                u.id = uid;
+                u.first_name = "Xabarchi uz";
+                u.flags = 0;
+                u.photo = new TLRPC.TL_userProfilePhotoEmpty();
+                u.status = new TLRPC.TL_userStatusEmpty();
+                putUser(u, true);
+            }
+            int date = (int) (last.created / 1000L);
+            if (last.created < 100000000000L) date = (int) last.created;
+            TLRPC.TL_message m = new TLRPC.TL_message();
+            m.id = (int) Math.min(Integer.MAX_VALUE - 1, Math.max(1, last.id));
+            m.date = date;
+            m.dialog_id = uid;
+            m.from_id = new TLRPC.TL_peerUser();
+            m.from_id.user_id = uid;
+            m.peer_id = new TLRPC.TL_peerUser();
+            m.peer_id.user_id = getUserConfig().getClientUserId();
+            m.out = false;
+            m.unread = AbugramInbox.unread() > 0;
+            String text = (last.title != null && !last.title.isEmpty() ? last.title + ": " : "") + (last.body == null ? "" : last.body);
+            m.message = text;
+            m.flags |= TLRPC.MESSAGE_FLAG_HAS_FROM_ID;
+            TLRPC.Dialog d = dialogs_dict.get(uid);
+            if (d == null) {
+                d = new TLRPC.TL_dialog();
+                d.id = uid;
+                d.peer = new TLRPC.TL_peerUser();
+                d.peer.user_id = uid;
+                d.notify_settings = new TLRPC.TL_peerNotifySettings();
+                d.folder_id = 0;
+                d.top_message = m.id;
+                dialogs_dict.put(uid, d);
+                allDialogs.add(d);
+            }
+            d.top_message = m.id;
+            d.last_message_date = date;
+            d.unread_count = AbugramInbox.unread();
+            MessageObject mo = new MessageObject(currentAccount, m, false, false);
+            ArrayList<MessageObject> arr = new ArrayList<>(1);
+            arr.add(mo);
+            dialogMessage.put(uid, arr);
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
     }
 
     public boolean isPromoDialog(long did, boolean checkLeft) {
@@ -18902,7 +18998,9 @@ public class MessagesController extends BaseController implements NotificationCe
                     arrayList = new ArrayList<>();
                     deletedMessages.put(0, arrayList);
                 }
-                arrayList.addAll(update.messages);
+                if (!AbugramConfig.keepDeletedActive()) {
+                    arrayList.addAll(update.messages);
+                }
             } else if (baseUpdate instanceof TL_update.TL_updateDeleteQuickReplyMessages) {
                 TL_update.TL_updateDeleteQuickReplyMessages update = (TL_update.TL_updateDeleteQuickReplyMessages) baseUpdate;
                 if (deletedQuickReplyMessages == null) {
@@ -19432,7 +19530,9 @@ public class MessagesController extends BaseController implements NotificationCe
                     arrayList = new ArrayList<>();
                     deletedMessages.put(dialogId, arrayList);
                 }
-                arrayList.addAll(update.messages);
+                if (!AbugramConfig.keepDeletedActive()) {
+                    arrayList.addAll(update.messages);
+                }
             } else if (baseUpdate instanceof TL_update.TL_updateChannel) {
                 if (BuildVars.LOGS_ENABLED) {
                     TL_update.TL_updateChannel update = (TL_update.TL_updateChannel) baseUpdate;
@@ -22435,6 +22535,7 @@ public class MessagesController extends BaseController implements NotificationCe
         if (chatsDict == null && ApplicationLoader.mainInterfacePaused) {
             return;
         }
+        abugramSyncInboxDialog();
         dialogsServerOnly.clear();
         dialogsCanAddUsers.clear();
         dialogsMyGroups.clear();
@@ -22508,7 +22609,7 @@ public class MessagesController extends BaseController implements NotificationCe
             Collections.sort(allDialogs, dialogComparator);
         } catch (Exception e) {}
         isLeftPromoChannel = true;
-        if (promoDialog != null && promoDialog.id < 0) {
+        if (promoDialog != null && promoDialog.id < 0 && promoDialogType != PROMO_TYPE_ABU) {
             TLRPC.Chat chat = getChat(-promoDialog.id);
             if (chat != null && !chat.left) {
                 isLeftPromoChannel = false;

@@ -142,6 +142,7 @@ import com.google.zxing.common.detector.MathUtils;
 
 import org.telegram.PhoneFormat.PhoneFormat;
 import org.telegram.messenger.AccountInstance;
+import org.telegram.messenger.AbugramTiming;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.BotForumHelper;
@@ -645,6 +646,8 @@ public class ChatActivity extends BaseFragment implements
     private AnimatedTextView searchExpandList;
     private AnimatedTextView searchOtherButton;
     private ChatActionCell floatingDateView;
+    // Abugram: the ad card at the top of the chat, and the height it takes from the message list
+    private AbugramAdCard abugramAdView;
     private TopicSeparator.Cell floatingTopicSeparator;
     private float intoTopViewTop;
     private ChatActionCell infoTopView;
@@ -7152,6 +7155,19 @@ public class ChatActivity extends BaseFragment implements
         floatingDateView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         floatingDateView.setInvalidateColors(true);
         contentView.addView(floatingDateView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 4, 0, 0));
+        if (chatMode == MODE_DEFAULT && parentChatActivity == null && topPanelLayout != null) {
+            // Abugram ad: the last row of the top panel, so it always sits under the pinned message / music bar,
+            // or directly under the chat title when there are none.
+            abugramAdView = new AbugramAdCard(context, () -> {
+                if (topPanelLayout != null && abugramAdView != null) {
+                    topPanelLayout.setViewVisible(abugramAdView, abugramAdView.isAdShown());
+                }
+            });
+            topPanelLayout.addView(abugramAdView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, AbugramAdCard.CARD_DP));
+            topPanelLayout.setPriority(abugramAdView, 100);
+            topPanelLayout.setDebugName(abugramAdView, "abugram ad");
+            abugramAdView.load();
+        }
         floatingDateView.setOnActionClickListener(view -> {
             if (floatingDateView.getAlpha() == 0 || actionBar.isActionModeShowed() || isReport()) {
                 return;
@@ -23187,6 +23203,9 @@ public class ChatActivity extends BaseFragment implements
                 return;
             }
             Integer msgId = (Integer) args[0];
+            if (args[1] instanceof Integer && args[3] instanceof Long) {
+                AbugramTiming.sent((Long) args[3], msgId, (Integer) args[1]);
+            }
             MessageObject obj = messagesDict[0].get(msgId);
             if (isThreadChat() && pendingSendMessagesDict.size() > 0) {
                 MessageObject object = pendingSendMessagesDict.get(msgId);

@@ -11075,7 +11075,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 if (userInfo != null && !TextUtils.isEmpty(userInfo.about)) {
                     userInfoRow = rowCount++;
                 }
-                if (user != null && username != null) {
+                if (user != null && (username != null || org.telegram.messenger.AbugramConfig.showIds)) {
                     usernameRow = rowCount++;
                 }
                 if (userInfo != null) {
@@ -11233,7 +11233,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         locationRow = rowCount++;
                     }
                 }
-                if (ChatObject.isPublic(currentChat)) {
+                if (ChatObject.isPublic(currentChat) || org.telegram.messenger.AbugramConfig.showIds) {
                     usernameRow = rowCount++;
                 }
             }
@@ -13744,6 +13744,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                             text = "";
                             value = "";
                             usernames = new ArrayList<>();
+                        }
+                        if (org.telegram.messenger.AbugramConfig.showIds && (userId != 0 || chatId != 0)) {
+                            // Abugram: the account's or chat's ID beside its username (Settings → Abugram → show IDs)
+                            value = TextUtils.concat(value, " · ID " + (userId != 0 ? userId : chatId));
                         }
                         detailCell.setTextAndValue(text, alsoUsernamesString(username, usernames, value), infoEndRowEmpty == -1 && (isTopic || bizHoursRow != -1 || bizLocationRow != -1) && birthdayRow < 0);
                     } else if (position == locationRow) {

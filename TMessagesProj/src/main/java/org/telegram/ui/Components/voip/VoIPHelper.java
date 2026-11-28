@@ -71,10 +71,28 @@ import java.util.Set;
 public class VoIPHelper {
 
 	public static long lastCallTime = 0;
+	private static boolean abugramCallConfirmed;
 
 	private static final int VOIP_SUPPORT_ID = 4244000;
 
 	public static void startCall(TLRPC.User user, boolean videoCall, boolean canVideoCall, final Activity activity, TLRPC.UserFull userFull, AccountInstance accountInstance) {
+		// Abugram: "confirm before calling" (Settings → Abugram), against a call placed by a slip of the finger
+		if (org.telegram.messenger.AbugramConfig.confirmCalls && !abugramCallConfirmed && activity != null && user != null) {
+			new AlertDialog.Builder(activity)
+					.setTitle("Qo'ng'iroq qilasizmi?")
+					.setMessage(org.telegram.messenger.UserObject.getUserName(user) + " ga " + (videoCall ? "video " : "") + "qo'ng'iroq qilinsinmi?")
+					.setPositiveButton(LocaleController.getString(R.string.Call), (dialog, which) -> {
+						abugramCallConfirmed = true;
+						try {
+							startCall(user, videoCall, canVideoCall, activity, userFull, accountInstance);
+						} finally {
+							abugramCallConfirmed = false;
+						}
+					})
+					.setNegativeButton(LocaleController.getString(R.string.Cancel), null)
+					.show();
+			return;
+		}
 		if (accountInstance == null ? MessagesController.getInstance(UserConfig.selectedAccount).isFrozen() : accountInstance.getMessagesController().isFrozen()) {
 			AccountFrozenAlert.show(accountInstance == null ? UserConfig.selectedAccount : accountInstance.getCurrentAccount());
 			return;

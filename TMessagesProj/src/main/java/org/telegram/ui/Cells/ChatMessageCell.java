@@ -103,6 +103,7 @@ import androidx.core.math.MathUtils;
 
 import org.telegram.PhoneFormat.PhoneFormat;
 import org.telegram.messenger.AccountInstance;
+import org.telegram.messenger.AbugramTiming;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.AppGlobalConfig;
 import org.telegram.messenger.ApplicationLoader;
@@ -15525,6 +15526,17 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             }
             w = (int) Math.ceil(Theme.chat_infoPaint.measureText(str));
         }
+        if (currentMessageObject != null && str.indexOf('/') >= 0) {
+            // Abugram: how long the rest of a large file takes
+            String eta = AbugramTiming.eta(currentMessageObject.getDialogId() + ":" + currentMessageObject.getId(), loadedSize, totalSize);
+            if (eta != null) {
+                int withEta = (int) Math.ceil(Theme.chat_infoPaint.measureText(str + eta));
+                if (!fullWidth || withEta <= backgroundWidth - dp(48)) {
+                    str = str + eta;
+                    w = withEta;
+                }
+            }
+        }
         loadingProgressLayout = new StaticLayout(str, Theme.chat_infoPaint, w, Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
     }
 
@@ -15657,6 +15669,16 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         timeString = timeString(currentMessageObject, messageObject, edited, currentMessagesGroup != null ? currentMessagesGroup.getMaxEditDate() : messageObject.messageOwner.edit_date);
         if (currentMessageObject.messageOwner.video_processing_pending) {
             timeString = formatString(R.string.ScheduledTimeApprox, timeString);
+        }
+        if (org.telegram.messenger.AbugramConfig.featureOn("sendTime") && currentMessageObject.isOutOwner() && currentMessageObject.messageOwner.media != null
+                && !(currentMessageObject.messageOwner.media instanceof TLRPC.TL_messageMediaEmpty)
+                && !(currentMessageObject.messageOwner.media instanceof TLRPC.TL_messageMediaWebPage)) {
+            // Abugram: how long the media took to send
+            AbugramTiming.seen(currentMessageObject.getDialogId(), currentMessageObject.getId());
+            long took = AbugramTiming.get(currentMessageObject.getDialogId(), currentMessageObject.getId());
+            if (took >= 300) {
+                timeString = timeString + " · " + AbugramTiming.format(took);
+            }
         }
         if (signString != null) {
             if (messageObject.messageOwner.via_business_bot_id != 0) {

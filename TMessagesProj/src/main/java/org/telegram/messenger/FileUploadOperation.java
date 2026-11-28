@@ -336,7 +336,17 @@ public class FileUploadOperation {
                     }
                     uploadChunkSize = chunkSize;
                 }
+                // Abugram: through the relay every part is one HTTPS request over the phone's uplink. Sixteen 512 KB parts at once
+                // are far more than the uplink carries: they queue behind each other, time out and are sent again. A few 128 KB
+                // parts at a time keep it full without that.
+                final boolean viaRelay = AbugramProxy.viaRelay() && !slowNetwork;
+                if (viaRelay && (totalFileSize + 1024L * maxUploadParts - 1) / (1024L * maxUploadParts) <= 128) {
+                    uploadChunkSize = 128;
+                }
                 maxRequestsCount = Math.max(1, (slowNetwork ? maxUploadingSlowNetworkKBytes : maxUploadingKBytes) / uploadChunkSize);
+                if (viaRelay) {
+                    maxRequestsCount = Math.min(maxRequestsCount, 6);
+                }
                 // TDLib uploads premium files over 8 sessions.
                 uploadConnectionsCount = AccountInstance.getInstance(currentAccount).getUserConfig().isPremium() ? ConnectionsManager.UploadConnectionsCountPremium : 4;
 
